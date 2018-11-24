@@ -1,0 +1,23 @@
+[Unit]
+Description=docker-openvpn
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-openvpn
+ExecStartPre=-/usr/bin/docker rm docker-openvpn
+ExecStartPre=/usr/bin/docker pull linuxserver/openvpn-as
+ExecStart=/usr/bin/docker run --rm \
+	--name=docker-openvpn \
+	--net host \
+	-v /etc/docker-openvpn:/config \
+	-e PGID=1002 -e PUID=1002 \
+	-e TZ="America/New_York" \
+	-e INTERFACE=enp3s0 \
+	--net=host --privileged \
+	linuxserver/openvpn-as
+ 
+[Install]
+WantedBy=multi-user.target

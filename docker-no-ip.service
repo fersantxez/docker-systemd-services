@@ -1,0 +1,15 @@
+[Unit]
+Description=docker-no-ip
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-no-ip
+ExecStartPre=-/usr/bin/docker rm docker-no-ip
+ExecStartPre=/usr/bin/docker pull coppit/no-ip
+ExecStart=/usr/bin/docker run --rm --name docker-no-ip -v /etc/localtime:/etc/localtime -v /etc/docker-no-ip:/config coppit/no-ip
+ 
+[Install]
+WantedBy=multi-user.target

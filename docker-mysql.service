@@ -1,0 +1,21 @@
+[Unit]
+Description=docker-mysql
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-mysql
+ExecStartPre=-/usr/bin/docker rm docker-mysql
+ExecStartPre=/usr/bin/docker pull mysql
+ExecStart=/usr/bin/docker run --rm --name docker-mysql \
+	-v /mnt/RAID1/MYSQL:/var/lib/mysql \
+	--net=host \
+	-p 3306:3306 \
+	-e MYSQL_ONETIME_PASSWORD=password \
+	-e MYSQL_ROOT_PASSWORD=password \
+	mysql 
+ 
+[Install]
+WantedBy=multi-user.target

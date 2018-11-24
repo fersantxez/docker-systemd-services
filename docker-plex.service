@@ -1,0 +1,12 @@
+[Unit]
+Description=docker-plex
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+Type=forking
+ExecStart=/usr/bin/docker-plex_on.sh
+#ExecStop=/usr/bin/docker-plex_off.sh
+
+[Install]
+WantedBy=multi-user.target

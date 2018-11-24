@@ -1,0 +1,19 @@
+[Unit]
+Description=docker-ngrok
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-ngrok
+ExecStartPre=-/usr/bin/docker rm docker-ngrok
+ExecStartPre=/usr/bin/docker pull wernight/docker-ngrok
+ExecStart=/usr/bin/docker run --rm --name docker-ngrok \
+    -it	\
+    --net=host \
+    -link web_service_container \
+    wernight/ngrok \
+	http web_service_container:80
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=docker-samba-dj
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-samba-dj
+ExecStartPre=-/usr/bin/docker rm docker-samba-dj
+ExecStartPre=/usr/bin/docker pull dperson/samba:latest
+ExecStart=/usr/bin/docker run --rm --name docker-samba-dj \
+	-v /mnt/RAID1/Audio/00_DJ:/mount \
+	--net=host \
+	-p 139:139/tcp \
+	-p 445:445/tcp  \
+	dperson/samba:latest \
+  -u "fersanchez;mysecretpassword" \
+  -s "DJ;/mount" \
+  -n
+[Install]
+WantedBy=multi-user.target
