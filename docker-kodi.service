@@ -4,17 +4,9 @@ After=docker.service
 Requires=docker.service
  
 [Service]
-TimeoutStartSec=0
-Restart=always
-ExecStartPre=-/usr/bin/docker stop docker-kodi
-ExecStartPre=-/usr/bin/docker rm docker-kodi
-ExecStartPre=/usr/bin/docker pull linuxserver/kodi-headless
-ExecStart=/usr/bin/docker run --rm --name docker-kodi \
-	-v /etc/kodi/.kodi:/config/.kodi \
-	-e PGID=1001 -e PUID=1001 \
-	-e TZ="America/New_York \
-	-p 8080:8080 -p 9777:9777/udp \
-	linuxserver/kodi-headless
- 
+Type=forking
+ExecStart=/usr/bin/docker-kodi_on.sh
+#ExecStop=/usr/bin/docker-kodi_off.sh
+
 [Install]
 WantedBy=multi-user.target
