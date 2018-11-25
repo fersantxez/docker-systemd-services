@@ -1,0 +1,158 @@
+OpenVPN-AS REST API
+-------------------
+
+The OpenVPN Access Server supports a Web Services API that can be
+used to fetch a client configuration file from the Access Server.
+
+The curl command can be used to easily access this API as follows:
+
+  curl -u USERNAME:PASSWORD https://ACCESS_SERVER:CWS_PORT/rest/METHOD
+
+Any generic HTTPS client tool (including even a web browser) can be used
+to access the API -- curl is just used here as an example.  Whatever
+method is used, the USERNAME:PASSWORD pair should be passed to the API
+using HTTP Basic Authentication.
+
+Replace the above variables in the curl command as follows:
+
+USERNAME -- the username of the Access Server user for whom a configuration
+            file is sought.
+
+PASSWORD -- the password of the Access Server user for whom a configuration
+            file is sought.
+
+ACCESS_SERVER -- the domain name or public IP address of the Access Server.
+
+CWS_PORT -- the port that the client web server is listening on.  Usually
+            443 but may be different based on the specific Access Server
+            configuration.  This is normally the same port that you would
+            use to connect to the Client Web Server UI.
+
+METHOD:
+
+  * GetUserlogin -- get an OpenVPN client configuration file
+    that will require a username and password to connect to the Access
+    Server.
+
+  * GetAutologin -- get an OpenVPN configuration file that will
+    authenticate with the Access Server using only a client
+    certificate, with no username and password required.  This is ideal
+    for unattended clients such as routers, servers, or appliances.
+    Note that for Autologin configurations, the user (specified by
+    USERNAME) must have the Autologin permission enabled in the User
+    Permissions page of the Access Server Admin UI.
+
+  * GetGeneric -- get a generic OpenVPN configuration file that is not
+    customized to a particular user.  This type of configuration is
+    used in External PKI mode, when client certificates/keys are
+    distributed out-of-band relative to the OpenVPN configuration
+    file.  Also note that when External PKI mode is enabled, both
+    GetUserlogin and GetAutologin methods return the generic
+    version configuration file.
+
+On success, the web services API will return the OpenVPN client configuration
+file as content-type text/plain.
+
+On error, an error message will be returned as content-type text/xml.  These
+are some of the common error returns:
+
+Authentication failed (bad USERNAME or PASSWORD):
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+  <Type>Authorization Required</Type>
+  <Synopsis>REST method failed</Synopsis>
+  <Message>AUTH_FAILED: Server Agent XML method requires authentication (9007)</Message>
+</Error>
+
+User does not have permission to use an Autologin profile:
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+  <Type>Internal Server Error</Type>
+  <Synopsis>REST method failed</Synopsis>
+  <Message>NEED_AUTOLOGIN: User 'USERNAME' lacks autologin privilege (9000)</Message>
+</Error>
+
+Handling challenge/response authentication:
+
+It is possible that the server may issue a challenge to the authentication
+request, for example suppose we have a user called 'test' and a password
+of 'mypass".  Get the OpenVPN config file:
+
+  curl -u test:mypass https://ACCESS_SERVER/rest/GetUserlogin
+
+But instead of immediately receiving the config file,
+we might get a challenge instead:
+
+<Error>
+  <Type>Authorization Required</Type>
+  <Synopsis>REST method failed</Synopsis>
+  <Message>CRV1:R,E:miwN39AlF4k40Fd8X8r9j74FuOoaJKJM:dGVzdA==:Turing test: what is 1 x 3? (9007)</Message>
+</Error>
+
+a challenge is indicated by the "CRV1:" prefix in the <Message> (meaning
+Challenge Response protocol Version 1).  The CRV1 message is formatted
+as follows:
+
+CRV1:<flags>:<state_id>:<username_base64>:<challenge_text>
+
+flags : a series of optional, comma-separated flags:
+  E : echo the response when the user types it
+  R : a response is required
+
+state_id: an opaque string that should be returned to the server
+along with the response.
+
+username_base64 : the username formatted as base64
+
+challenge_text : the challenge text to be shown to the user
+
+After showing the challenge_text and getting a response from the user
+(if R flag is specified), the client should resubmit the REST
+request with the USERNAME:PASSWORD field in the HTTP header set
+as follows:
+
+<username decoded from username_base64>:CRV1::<state_id>::<response_text>
+
+Where state_id is taken from the challenge request and response_text
+is what the user entered in response to the challenge_text.
+If the R flag is not present, response_text may be the empty
+string.
+
+Using curl to respond to the turing test given in the example above:
+
+  curl -u "test:CRV1::miwN39AlF4k40Fd8X8r9j74FuOoaJKJM::3" https://ACCESS_SERVER/rest/GetUserlogin
+
+If the challenge response (In this case '3' in response to the turing
+test) is verified by the server, it will then return the configuration
+file per the GetUserlogin method.
+
+
+
+Keep in mind that when using curl as the HTTPS client, curl will require
+that the Access Server web server uses a trusted certificate, such as
+a commercial web certificate.  If your Access Server uses a self-signed CA,
+then it would be advisable to make this certificate available to curl, or
+whatever HTTPS client you are using.
+
+The Access Server web CA certificate can be obtained as follows:
+
+cd /usr/local/openvpn_as/scripts
+mkdir web-certs
+./sacli --dest_dir web-certs GetActiveWebCerts
+
+The CA certificate will be saved to web-certs/ca.crt
+
+  /usr/local/openvpn_as/etc/web-ssl/ca.crt
+
+and can be specified to curl using the following option:
+
+  --cacert ca.crt
+
+It is also possible to instruct curl to disable web server certificate
+verification using the -k option, but this should be discouraged for
+security reasons.
+
+Also note that the OpenVPN client configuration files obtained from the
+Access Server APIs must be run with OpenVPN 2.1 or higher.

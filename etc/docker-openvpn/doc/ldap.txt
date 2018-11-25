@@ -1,0 +1,115 @@
+OpenVPN Access Server LDAP notes
+--------------------------------
+
+These notes describe configuration of the OpenVPN Access Server (OAS)
+LDAP module using command line tools.
+
+OAS stores its configuration parameters in a key/value DB.  There
+are two methods provided for modifying this DB using command line
+tools:
+
+(1) sacli -- this tool does not access the configuration DB directly
+    but rather interacts with the OAS backend daemon API.
+
+    First cd to /usr/local/openvpn_as/scripts
+
+    To set KEY to VALUE:
+      ./sacli --key KEY --value VALUE ConfigPut
+
+    For example to enable LDAP mode:
+      ./sacli --key auth.module.type --value ldap ConfigPut
+
+(2) confdba -- this tool directly writes configuration settings
+    to the configuration database.
+
+    First cd to /usr/local/openvpn_as/scripts
+
+    To set KEY to VALUE:
+      ./confdba --mod --key KEY --value VALUE
+
+    For example to enable LDAP mode:
+      ./confdba --mod --key auth.module.type --value ldap
+
+At the end of any sequence of changes to the configuration
+DB, make sure to restart any OAS services affected by the
+change:
+  ./sacli start
+
+
+OpenVPN Access Server LDAP settings
+-----------------------------------
+
+auth.module.type (string) : must be set to "ldap" to enable the
+        OAS LDAP module
+
+auth.ldap.0.server.0.host (string) : primary LDAP server (DNS name or
+        IP address)
+
+auth.ldap.0.server.1.host (string, optional) : backup LDAP server
+
+auth.ldap.0.bind_dn : distinguished name describing LDAP account that
+        OAS will bind to, normally an Administrator account
+
+auth.ldap.0.bind_pw : password for account described by bind_dn
+
+auth.ldap.0.name : friendly name for this set of LDAP servers
+
+auth.ldap.0.users_base_dn : base DN used for user searches in the LDAP
+        database
+
+auth.ldap.0.uname_attr : LDAP attribute that describes username, use
+        "sAMAccountName" for Active Directory
+
+auth.ldap.0.add_req : additional requirements -- LDAP expression that
+        must evaluate as true as a prerequisite for user to be
+        authenticated.  For example on Active Directory, the following
+        string would require that users are members of the
+        administrators group.  Replace DC=myserver,DC=mycompany,DC=tld
+        with the base DN of your LDAP server.
+
+        &(memberOf=CN=Administrators,CN=Builtin,DC=myserver,DC=mycompany,DC=tld)(memberOf=CN=Administrators,CN=Builtin,DC=myserver,DC=mycompany,DC=tld)
+
+auth.ldap.0.referrals (integer, default=0) : corresponds to OpenLDAP
+        LDAP_OPT_REFERRALS setting -- determines whether OpenLDAP
+        should implicitly chase referrals or not (0: don't follow,
+        1: follow)
+
+auth.ldap.0.timeout (integer, default=5) : corresponds to OpenLDAP
+        LDAP_OPT_TIMEOUT and LDAP_OPT_NETWORK_TIMEOUT settings --
+        controls the number of seconds we will wait for a response
+        from the LDAP server before failing over to the backup
+	LDAP server.
+
+auth.ldap.0.use_ssl (string, default="never") : controls whether the
+        OAS connects with the LDAP server via SSL.  The option
+	should be one of these three values:
+	1. never : don't use SSL
+	2. adaptive : try SSL then fall back to cleartext if no
+           response
+        3. always : always use SSL
+
+auth.ldap.0.ssl_verify (string, default="never") : corresponds to the
+        LDAP_OPT_X_TLS_REQUIRE_CERT OpenLDAP setting.  When SSL is
+        used, controls the extent to which we validate the SSL
+        certificate of the LDAP server.  The option should be one of
+        these three values:
+	1. never -- no peer certificate is required
+	2. allow -- a peer certificate is requested, however the
+           session will not be aborted if the certificate cannot
+           be validated
+        3. demand -- a valid peer certificate is required, and
+           the session will aborted if one is not provided
+
+auth.ldap.0.ssl_ca_cert (filename) : corresponds to the OpenLDAP
+        LDAP_OPT_X_TLS_CACERTFILE setting.  Specifies a CA certificate
+        bundle to use for validating the LDAP server certificate.
+
+auth.ldap.0.openldap_trace_level (integer, default=0) : corresponds
+        to the OpenLDAP trace level.  CAUTION: if this parameter
+        is nonzero, OpenLDAP may output sensitive information
+        (such as passwords) to the log file.
+
+auth.ldap.0.debug_level (integer, default=0) : corresponds to the
+        OpenLDAP LDAP_OPT_DEBUG_LEVEL setting.  CAUTION: if this
+        parameter is nonzero, OpenLDAP may output sensitive
+        information (such as passwords) to the log file.

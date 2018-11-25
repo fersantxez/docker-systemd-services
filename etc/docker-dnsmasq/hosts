@@ -1,0 +1,32 @@
+127.0.0.1	localhost
+#127.0.1.1	mothership.fersanchez.ddns.net	mothership
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+192.168.99.178 ipadmeri #3C:E0:72:BE:15:B8
+192.168.99.179 ipadfer #4C:B1:99:2D:73:EB
+192.168.99.180 pixel2fer #B4:F1:DA:E9:97:03
+#
+192.168.99.199 ferlan #A8:20:66:2B:84:03
+192.168.99.198 ferwork #F4:F9:51:F0:FD:42
+192.168.99.197 ferworkwifi #8C:85:90:31:1B:71
+#
+192.168.99.200 mothership #00:23:7d:fb:d4:c6
+192.168.99.202 minnowboard #00:08:A2:09:BD:56
+192.168.99.203 manolo #B8:27:EB:32:A4:39
+192.168.99.204 manolowifi #B8:27:EB:67:F1:6C
+#
+192.168.99.210 roku2 #B8:A1:75:EC:0A:1A
+192.168.99.211 appletv2 #68:64:4B:50:02:E3
+192.168.99.212 chromecast #6C:AD:F8:48:B9:91
+192.168.99.213 appletv #00:26:B0:FD:4E:0D
+192.168.99.215 sonosbridge #B8:E9:37:11:D1:EA
+192.168.99.216 sonosbar #00:0E:58:BD:C8:FA
+192.168.99.217 sonosls #B8:E9:37:5C:2E:58
+192.168.99.218 sonossub #00:0E:58:9C:F9:FC
+192.168.99.219 sonosrs #B8:E9:37:5C:2A:66
+192.168.99.220 googlehome #E4:F0:42:28:52:12
+#
+192.168.99.249 ciscoswitch #18:9C:5D:F7:90:71

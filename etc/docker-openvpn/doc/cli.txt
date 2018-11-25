@@ -1,0 +1,1819 @@
+OpenVPN Access Server Command-line Tools
+----------------------------------------
+
+Introduction
+------------
+
+The Access Server contains a rich set of command line tools for managing
+every aspect of the VPN server operation.  The tools are located
+in /usr/local/openvpn_as/scripts.  Most of the tools accept a --help
+option for displaying options and documentation.
+
+The latest version of this document is bundled in the Access Server
+distribution at /usr/local/openvpn_as/doc/cli.txt
+
+
+Authentication
+--------------
+
+Much of the functionality for managing users and user permissions
+is contained in the 'sacli' tool.  To use the sacli tool,
+authentication is required:
+
+(a) either the Access Server admin username and password must be
+    specified on the sacli command line (or from the keyboard), or
+
+(b) sacli users must be locally logged in as root, in which case no
+    credentials are required.
+
+If you choose method (a), then you should begin all sacli commands as follows:
+
+  ./sacli -a <AS_ADMIN_USER> -p <AS_ADMIN_PASSWORD> ...
+
+or
+
+  ./sacli -a <AS_ADMIN_USER> -i ...
+
+The latter form will prompt for a non-echoed password from the console.
+
+If you choose method (b), and you are running sacli as root, then you can simply
+specify the sacli command as such:
+
+  ./sacli ...
+
+
+User/Group Management
+---------------------
+
+The Access Server defines a number of properties that can be associated
+with a user, group, or the whole server.  In the settings below,
+where USER_OR_GROUP is specified, it may be defined as:
+
+1. a user name
+2. a group name
+3. global to the entire server by using "__DEFAULT__"
+
+If a property is defined at multiple-levels, the order of preference
+(from highest priority to lowest) will be user, group, then
+__DEFAULT__.  So for example, you could set a property globally by
+using the "__DEFAULT__" user, but then override the property at the
+user or group level.
+
+User/group operations:
+
+Show the current properties for a specific user or group:
+
+  ./confdba -us -p <USER_OR_GROUP>
+
+Show the current properties for all user/groups:
+
+  ./confdba -us
+
+Edit user properties in a text editor then reload:
+
+  ./confdba -us >userprop.txt
+  [ edit JSON in userprop.txt ]
+  ./confdba -ulf userprop.txt
+
+Generate a standard user-locked profile for a user that requires
+credential entry:
+
+  ./sacli --user <USER> GetUserlogin >client.ovpn
+
+Generate an autologin profile for a user that doesn't require credential
+entry (autologin profiles use only a client certificate for security):
+
+  ./sacli --user <USER> --key prop_autologin --value true UserPropPut
+  ./sacli --user <USER> GetAutologin >client.ovpn
+
+Generate a Windows MSI-based client installer that is bundled with a
+standard user-locked profile:
+
+  ./sacli --itype msi -u <USER> -o <OUTPUT_DIRECTORY> GetInstallerEx
+
+Generate a Mac OS X DMG-based client installer that is bundled with a
+standard user-locked profile:
+
+  ./sacli --itype dmg -u <USER> -o <OUTPUT_DIRECTORY> GetInstallerEx
+
+Generate a Windows MSI-based client installer that is bundled with an
+autologin profile:
+
+  ./sacli --user <USER> --key prop_autologin --value true UserPropPut
+  ./sacli --itype msi --autologin -u <USER> -o <OUTPUT_DIRECTORY> GetInstallerEx
+
+Generate a Mac OS X DMG-based client installer that is bundled with an
+autologin profile:
+
+  ./sacli --user <USER> --key prop_autologin --value true UserPropPut
+  ./sacli --itype dmg --autologin -u <USER> -o <OUTPUT_DIRECTORY> GetInstallerEx
+
+Generate a Windows MSI-based client installer that is bundled with a
+server-locked profile (use this for External PKI configurations):
+
+  ./sacli --itype msi -o <OUTPUT_DIRECTORY> GetGenericInstaller
+
+Generate a Mac OS X DMG-based client installer that is bundled with a
+server-locked profile (use this for External PKI configurations):
+
+  ./sacli --itype dmg -o <OUTPUT_DIRECTORY> GetGenericInstaller
+
+Add a user to a group:
+
+  ./sacli --user <USER> --key conn_group --value <GROUP_NAME> UserPropPut
+
+Assign a user a fixed IP address:
+
+  ./sacli --user <USER> --key conn_ip --value <IP_ADDRESS> UserPropPut
+  ./sacli start
+
+NOTE: When assigning fixed IP addresses, note that the Access Server scales
+more efficiently when users having fixed IP addresses are members of
+a group.
+
+Revoke a user's client certificate and profile, so that the user
+cannot log into the VPN server until they obtain a new profile:
+
+  ./sacli --user <USER> RevokeUser
+
+Ban a user from logging into the VPN or Web server
+(doesn't affect a user who is already logged in -- for this,
+use DisconnectUser below):
+
+  ./sacli --user <USER> --key prop_deny --value true UserPropPut
+
+Re-admit a user who was previously banned:
+
+  ./sacli --user <USER> --key prop_deny --value false UserPropPut
+
+Disconnect all instances of a given user profile from the VPN
+(To prevent them from logging back in, ban them before issuing
+this command).  This command will return the number of clients
+that were disconnected.
+
+  ./sacli -u <USER> DisconnectUser
+
+Disconnect all instances of a given user profile from the VPN,
+and show a human-readable text message in the VPN client UI
+explaining the reason for disconnect:
+
+  ./sacli -u <USER> --client_reason="This mission is too important for me to allow you to jeopardize it" DisconnectUser
+
+Kick VPN client to do an unattended reconnect.  The --restart flag tells the
+client to restart rather than halt, and the --psid flag tells the server to
+preserve the client's current session ID, so that it will be able to reconnect
+without asking the user for credentials.
+
+  ./sacli -u <USER> --restart --psid DisconnectUser
+
+Grant a user admin privileges:
+
+  ./sacli --user <USER> --key prop_superuser --value true UserPropPut
+
+Revoke admin privileges:
+
+  ./sacli --user <USER> --key prop_superuser --value false UserPropPut
+
+Allow a user to obtain an autologin profile (i.e. a profile that doesn't
+require credential entry):
+
+  ./sacli --user <USER> --key prop_autologin --value true UserPropPut
+
+Allow all users to obtain an autologin profile:
+
+  ./sacli --user __DEFAULT__ --key prop_autologin --value true UserPropPut
+
+Undo the above setting:
+
+  ./sacli --user __DEFAULT__ --key prop_autologin UserPropDel
+
+Disable LZO compression for a given user/group (regardless of the global
+LZO setting).
+
+  ./sacli --user <USER_OR_GROUP> --key prop_lzo --value false UserPropPut
+
+Enable LZO compression for a given user/group (regardless of the global
+LZO setting).
+
+  ./sacli --user <USER_OR_GROUP> --key prop_lzo --value false UserPropPut
+
+Override the global redirect-gateway setting for a specific user/group
+(redirect-gateway, when enabled, causes the VPN client to route
+all of its internet traffic through the VPN):
+
+  ./sacli --user <USER_OR_GROUP> --key prop_reroute_gw_override --value <MODE> UserPropPut
+
+Where <MODE> is one of:
+    disable  : disable redirect-gateway for this user
+    dns_only : disable redirect-gateway for this user, but still route DNS
+    global   : use global redirect-gateway setting (default)
+
+Delete a user/group properties setting, reverting it to the default.  For
+example:
+
+  ./sacli --user <USER_OR_GROUP> --key prop_reroute_gw_override UserPropDel
+  ./sacli --user <USER_OR_GROUP> --key prop_lzo UserPropDel
+  ./sacli --user <USER_OR_GROUP> --key prop_autologin UserPropDel
+
+Delete all properties for a user or group:
+
+  ./sacli --user <USER_OR_GROUP> UserPropDelAll
+
+Configure a user/group so that profiles or installers downloaded from
+the Access Server (by the user or members of the group) will, by default,
+be set to run as a service:
+
+  ./sacli --user <USER_OR_GROUP> --key cli_service --value true UserPropPut
+
+
+Branding
+--------
+
+The Access Server can identify itself using your company name and logo.
+
+Edit /usr/local/openvpn_as/etc/as.conf and set the company name and
+logo image file variables.
+
+  sa.company_name=Acme Terraforming
+  sa.logo_image_file=mylogo.png
+
+After making the change to as.conf, do a cold restart:
+
+  /etc/init.d/openvpnas restart
+
+
+Certificate Revocation Lists
+----------------------------
+
+Use a CRL (certificate revocation list) to deny access to specific
+client certificate serial numbers.  Clients that attempt to connect
+whose client certificate is listed in the CRL will be denied access,
+and further, any connected clients listed in the CRL at the time
+that it is loaded will be immediately disconnected.  Once a CRL file
+has been named via the vpn.server.crl key and initially loaded using
+./sacli start, the file may be updated at any time and it will be
+automatically reloaded by the server within a few seconds (the file
+resample time is controlled by vpn.server.crl_resample, stated as an
+integer number of seconds, with default=10).  The CRL file should
+be in PEM format.
+
+  ./sacli -k vpn.server.crl -v <CRL_FILE> ConfigPut
+  ./sacli start
+
+Notes:
+
+* For connecting clients, every certificate in the client certificate
+  chain will be checked against the specific CRL (if provided) that
+  matches the issuer of the certificate.
+
+* The CRL file may contain multiple PEM-format CRLs concatenated
+  together, corresponding to multiple root/intermediate certs in
+  the client CA chain.
+
+* All CRLs must have been signed by a CA in the client CA bundle
+  (this restriction can be relaxed by setting
+  vpn.server.ignore_unknown_crls to "true").
+
+
+Certificate/Key Management
+--------------------------
+
+By default, the Access Server manages CAs, certificates, and keys
+for the VPN server, VPN clients, and web server.  Alternatively,
+it is possible to have the Access Server interoperate with your
+own PKI (public key infrastructure).  This is described in detail
+in the External PKI document which can be found in
+/usr/local/openvpn_as/doc/epki.txt.
+
+
+Controlling the minimum TLS version
+-----------------------------------
+
+By default, OpenVPN communicates using TLS version 1.0.  Newer
+versions of OpenVPN support negotiation of the TLS version so that
+communication will occur using the highest TLS version supported
+by both client and server.  The OpenVPN Access Server 2.0 supports
+this negotiation by default.
+
+However even with TLS version negotiation, it is still possible for
+TLS 1.0 to be used, as this is the lowest TLS version supported by
+all versions of OpenVPN.  To prevent this from occurring, it is
+possible to force both OpenVPN client and server to require a
+minimum TLS version that is higher than 1.0.
+
+These config keys support controlling the TLS version:
+
+  vpn.client.tls_version_min (string) -- The minimum TLS version
+    that the client requires of the server.  Can be "1.0" (default),
+    "1.1", "1.2", or higher if and when new TLS versions are
+    implemented.
+
+  vpn.client.tls_version_min_strict (boolean) -- If true, client
+    will voluntarily refuse the connection if its underlying
+    SSL implementation doesn't support the given
+    vpn.client.tls_version_min value.
+
+  vpn.server.tls_version_min (string) -- The minimum TLS version
+    that the server requires of the client.  Can be "1.0" (default),
+    "1.1", "1.2", or higher if and when new TLS versions are
+    implemented.
+
+For example, to force client profiles generated by the Access Server
+to refuse to connect to the OpenVPN server except at TLS version
+1.2 or higher, configure the following setting:
+
+  ./sacli --key vpn.client.tls_version_min --value 1.2 ConfigPut
+  ./sacli start
+
+The above usage will still allow older OpenVPN clients that don't
+support TLS 1.2 to connect at lower TLS versions.
+
+If you want to be even more strict and unconditionally require
+TLS 1.2 even if it means refusing connections from older OpenVPN
+clients, configure the following settings:
+
+  ./sacli --key vpn.client.tls_version_min --value 1.2 ConfigPut
+  ./sacli --key vpn.client.tls_version_min_strict --value true ConfigPut
+  ./sacli --key vpn.server.tls_version_min --value 1.2 ConfigPut
+  ./sacli start
+
+
+Disabling client certificate use
+--------------------------------
+
+By default, the Access Server always generates client profiles with
+a unique client certificate and private key.
+
+However, it is possible to modify the Access Server configuration to
+operate without client certificates or keys -- in this case, only
+password-based authentication will be used to authenticate clients
+(but be aware of the security implications of disabling client
+certificate usage).
+
+When client certificate usage is disabled, the AS will no longer use
+the Certificates DB.  This means that the CA certificate (ca.crt),
+server certificate (server.crt), server private key (server.key),
+tls-auth key (ta.key), and DH parameters (dh.pem) must be loaded into
+the AS configuration DB.
+
+First get the existing AS certs/keys for the server side:
+
+  cd /usr/local/openvpn_as/scripts
+  mkdir -p server-certs
+  ./sacli -o server-certs GetServer
+
+Next, add the certs to the config DB:
+
+  pushd server-certs
+  ../confdba -mk external_pki.ca_crt --value_file ca.crt
+  ../confdba -mk external_pki.server_crt --value_file server.crt
+  ../confdba -mk external_pki.server_key --value_file server.key
+  ../confdba -mk external_pki.ta_key --value_file ta.key
+  ../confdba -mk external_pki.dh_pem --value_file dh*.pem
+  popd
+
+Next, edit /usr/local/openvpn_as/etc/as.conf and add the following
+option:
+
+  no_client_cert=true
+
+and restart the AS:
+
+  /etc/init.d/openvpnas restart
+
+Now the AS will function without client certificates.
+
+
+Google Authenticator two-step authentication
+--------------------------------------------
+
+The Access Server fully supports the Google Authenticator two-step
+authentication system.  When using Google Authenticator, the VPN
+user's mobile phone acts as a multi-factor authentication token
+that generates a 6-digit code that changes every 30 seconds.
+
+When connecting to the VPN, the user will be asked to enter a
+6-digit Google Authenticator code in addition to their user ID
+and password.
+
+To enable Google Authenticator in the Access Server, a checkbox is
+provided in the Admin UI under Client Settings.  You can also
+enable it from the command line:
+
+  ./sacli --key vpn.server.google_auth.enable --value true ConfigPut
+  ./sacli start
+
+Once this is done, users will need to install the Google Authenticator
+app on their mobile phones and scan a QR code in the Client Web Server
+to configure the app with their Google Authenticator secret.
+
+Once configured, the mobile app will act as a secure token,
+generating a 6-digit one-time-password that is entered along with
+the user ID and password for every VPN login.
+
+NOTE: When using Google Authenticator, the Access Server system time
+must be precisely set.  This can be done by installing the NTP daemon
+on the Access Server machine.  For example, on Ubuntu/Debian systems:
+
+  sudo apt-get install ntp
+
+Google Authenticator FAQ:
+
+Q: Where can I get more info on the conceptual and technical
+   aspects of Google Authenticator?
+
+A: http://en.wikipedia.org/wiki/Google_Authenticator
+
+Q: Which mobile platforms support the Google Authenticator app?
+
+A: Google provides Android, iOS, and BlackBerry versions of the Authenticator
+   app.  Third-party implementations are available for Windows Mobile.
+
+Q: How to enable Google Authenticator in general, but disable it
+   for certain specific accounts or groups?
+
+A: First, enable Google Authenticator for all accounts:
+
+   ./sacli --key vpn.server.google_auth.enable --value true ConfigPut
+   ./sacli start
+
+   Next, disable for specific users or groups:
+
+   ./sacli --user <USER_OR_GROUP> --key prop_google_auth --value false UserPropPut
+
+Q: How to disable Google Authenticator in general, but enable it
+   for certain specific accounts or groups?
+
+A: First, disable Google Authenticator for all accounts:
+
+   ./sacli --key vpn.server.google_auth.enable --value false ConfigPut
+   ./sacli start
+
+   Next, enable for specific users or groups:
+
+   ./sacli --user <USER_OR_GROUP> --key prop_google_auth --value true UserPropPut
+
+Q: What if a user is unable to scan their Google Authenticator QR code
+   from the Client Web Server into their mobile device?
+
+A: The Google Authenticator secret is shown as text in the Client Web
+   Server below the QR code.  It looks something like this:
+
+   R77GCTVS4RH5HHCI
+
+   The secret can be entered as text into the Google Authenticator mobile
+   App.  To do this, select "Time Based" token in the app, and enter
+   the secret in the "Key" field.
+
+Q: A user who has already scanned and locked their Google Authenticator
+   secret needs to unlock the secret so it can be viewed in the Client Web
+   Server and rescanned.  How to do this?
+
+A: Admins can unlock a Google Authenticator secret using this command:
+
+   ./sacli -u <USER> --lock 0 GoogleAuthLock
+
+Q: A user's Google Authenticator secret was compromised.  How to revoke and
+   reissue the secret?
+
+A: Admins can revoke and reissue a secret using this command.  This will
+   result in a new, unlocked secret:
+
+   ./sacli -u <USER> GoogleAuthRegen
+
+   To regenerate a secret that is initially locked (i.e. the user
+   will not be able to view it in the Client Web Server), use
+   this command:
+
+   ./sacli -u <USER> --lock 1 GoogleAuthRegen
+
+Q: Does using Google Authenticator mean that Google will have access
+   to users' authentication information?
+
+A: No.  The Google Authenticator app only implements a mathematical
+   algorithm for one-time password generation -- there is no tie-in
+   with Google web services, nor does the Access Server need to
+   communicate with any external server to validate a
+   Google Authenticator code. 
+
+Q: Since a Google Authenticator code is current for only 30 seconds,
+   what if a user enters a code at the end of the 30-second window,
+   causing the server to see the code shortly after it has expired?
+
+A: At any given time, the AS will allow 3 different codes to be
+   used for authentication:
+
+   (1) The code that was active during the previous 30 second window.
+   (2) The code that is active right now.
+   (3) The code that will be active during the next 30 second window.
+
+   Therefore, a code entered just before the end of its 30 second
+   window will still be honored by the AS for 30 additional seconds
+   (assuming that the AS machine and mobile device clocks are
+   accurately set).
+
+Q: What is the difference between a Google Authenticator secret and
+   code?
+
+A: The Google Authenticator secret is the master key that is used
+   to generate a new Google Authenticator code every 30 seconds.
+   Each user has a different secret, and the secret is randomly
+   generated by the AS.  The secret can be viewed as a QR-code
+   in the Client Web Server and scanned onto a mobile device using
+   the Google Authenticator app.  The Google Authenticator code is
+   entered along with user ID and password when connecting to the VPN.
+
+Q: What does it mean when the Google Authenticator secret is said to
+   be unlocked or locked?
+
+A: When a Google Authenticator secret is first generated by the AS,
+   but before it has been scanned by the user into their mobile device,
+   it is said to be unlocked.  When a user's account is associated with
+   an unlocked secret, the user can log into the client web server with only
+   user ID and password authentication, and the Google Authenticator secret
+   will be visible (both as text and as a QR code), however no
+   VPN connections are allowed.  The Google Authenticator secret
+   can be locked by one of the following actions:
+
+   (a) the user clicks on the "I scanned the QR code" button in the
+       client web server,
+
+   (b) the user logs into the VPN using a valid Google Authenticator
+       code, or
+
+   (c) the Admin manually locks the secret, or manually
+       generates the secret in an already-locked state.
+
+       Unlock a secret:
+         ./sacli -u <USER> --lock 0 GoogleAuthLock
+       Lock a secret:
+         ./sacli -u <USER> --lock 1 GoogleAuthLock
+       Generate a new, unlocked secret:
+         ./sacli -u <USER> --lock 0 GoogleAuthRegen
+       Generate a new, locked secret:
+         ./sacli -u <USER> --lock 1 GoogleAuthRegen
+
+   An unlocked secret is visible in the client web server.  Once locked,
+   the secret is no longer visible, and all logins (both VPN and web)
+   will require a valid Google Authenticator code.
+
+Q: If a user can access the Google Authenticator secret in the
+   Client Web Server by only authorizing with user ID and password,
+   doesn't that negate the security of Google Authenticator?
+
+A: Before a user has configured their Google Authenticator secret
+   in their phone, the secret is considered to be "unlocked".  This
+   means that they can log into the Client Web Server (CWS) with only
+   a user ID and password, and VPN access is disabled.  The secret
+   becomes locked after the user has scanned it (via a QR code) into the
+   Google Authenticator mobile app.  Once locked, the Google Authenticator
+   code must be provided for ALL logins (VPN and CWS), and the
+   secret itself is no longer visible in the CWS.
+
+   So during the period before the user has scanned and locked the
+   secret, the account is essentially unprotected by Google Authenticator.
+   There are two ways to mitigate this risk:
+
+   (a) For organizations that operate an internal intranet, the
+       Access Server can be configured so that the Client Web
+       Server only listens on an intranet-facing address.  This
+       can be configured in the Admin UI under Server Network
+       Settings.  When configured as such, the end user would
+       need to initially key the Google Authenticator app
+       when connected to the organization's intranet.  This
+       protects the account, since VPN access always requires
+       a Google Authenticator code, and in such a configuration,
+       only VPN access would be accessible from the public
+       internet.
+
+   (b) The AS can be configured so that the Google Authenticator
+       secret is always locked and never visible to users via the
+       Client Web Server.  This requires that the AS Admin manually
+       generates and distributes the Google Authenticator secret
+       to end users or develops their own solution for distribution
+       of the Google Authenticator secret.
+
+       To do this, first configure the AS to only allow
+       Google Authenticator secrets to be generated and viewed by
+       an AS Admin:
+
+       ./sacli --key vpn.server.google_auth.admin_locked --value true ConfigPut
+       ./sacli start
+
+       Next, the AS Admin can generate secrets for specific users, e.g.:
+
+       ./sacli -u USER GoogleAuthRegen
+
+       The above command will generate:
+       (a) a Google Authenticator secret, and
+       (b) a Google Authenticator URL that when rendered as a QR code,
+           can be scanned by the Google Authenticator app running on
+           a mobile device.
+
+       Sample output:
+
+       ['DYL35S3X5OXFT4PA', 'otpauth://totp/OpenVPN:test@vpn.example.com?secret=DYL35S3X5OXFT4PA&issuer=OpenVPN']
+
+       DYL35S3X5OXFT4PA is the Google Authenticator secret and the otpauth:// URL
+       can be rendered as a QR code and scanned by the Google Authenticator app
+       as a way of "downloading" the secret onto a mobile device.
+
+Q: When Google Authenticator is enabled for an account, how does
+   that affect the Access Server REST API?
+
+A: When Google Authenticator is enabled for an account and the Google
+   Authenticator secret is locked, then the Google Authenticator code
+   must be provided for all logins, even logins via the Access Server
+   REST API.
+
+   If you are a developer and have code that interacts with the REST
+   API, you would need to implement the OpenVPN challenge/response
+   protocol in order to authenticate an Access Server account that
+   has Google Authenticator enabled.
+
+   The OpenVPN challenge/response protocol is documented in the
+   OpenVPN package.  Go to the link below and search for
+   "Challenge/Response Protocol" near the end of the document.
+
+   https://github.com/OpenVPN/openvpn/blob/master/doc/management-notes.txt
+
+   The OpenVPN challenge/response protocol is actually two protocols,
+   one static and one dynamic.  Currently the Access Server REST API
+   only supports the Dynamic Protocol.
+
+   Suppose you want to obtain a Userlogin profile for a given user
+   from an Access Server.  Using curl, this would normally be done
+   as follows:
+
+   curl -u USERNAME:PASSWORD https://SERVER:443/rest/GetUserlogin
+
+   If your server has a self-signed SSL cert, add the "-k" flag to
+   disable cert verifcation:
+
+   curl -k -u USERNAME:PASSWORD https://SERVER:443/rest/GetUserlogin
+
+   Now suppose that the account has Google Authenticator enabled,
+   and you attempt the above command.  Instead of receiving the
+   profile, you will receive an XML error that is essentially a
+   challenge to produce the Google Authenticator code:
+
+  <Error>
+    <Type>Authorization Required</Type>
+    <Synopsis>REST method failed</Synopsis>
+    <Message>CRV1:R,E:cSvumRLUUMpQ8E4JDpR6bg6KvcWOKJCn:dGVzdA==:Enter Google Authenticator Code (9007)</Message>
+  </Error>
+
+  <Message> is a colon-delimited sequence of strings.  The first string
+  "CRV1" indicates the OpenVPN dynamic challenge/response protocol version
+  1.  The R,E indicates that a response is required ('R'), and the
+  response should be echoed ('E') in the end-user UI.  The next field
+  ("cSvumRLUUMpQ8E4JDpR6bg6KvcWOKJCn") is the State ID.  It will be sent
+  back to the server to complete the authentication.  The next field is
+  the username rendered as base 64 ("dGVzdA==").  The final field is
+  the human-readable challenge message.
+
+  Now to complete the authentication, you will need to extract the State
+  ID from the string, get the Google Authenticator code from the user,
+  and retry the REST request as follows.
+
+  curl -u USERNAME:CRV1::STATE_ID::GOOGLE_AUTH_CODE https://SERVER:443/rest/GetUserlogin
+
+  Suppose the Google Authenticator code is 197132.  You would then
+  retry the REST request as follows:
+
+  curl -u USERNAME:CRV1::cSvumRLUUMpQ8E4JDpR6bg6KvcWOKJCn::197132 https://SERVER:443/rest/GetUserlogin
+
+Notes:
+
+* All Access server accounts may use Google Authenticator except
+  for the initially-configured admin user or accounts that use
+  autologin profiles.
+
+* Google Authenticator requires that both the machine running the
+  Access Server and the mobile devices that run the Google Authenticator
+  app are set with an accurate time, i.e. within an accuracy of +/- 30 seconds
+  (time zone differences are automatically accounted for).
+
+
+Custom Authentication Algorithms
+--------------------------------
+
+The Access Server supports a Python-based plugin system for adding
+custom code to augment the authentication process.  For example,
+with a few lines of code it is possible to add a custom multi-factor
+authentication step to the authentication process.
+
+This is described in detail in the Post-Auth Scripting document:
+
+/usr/local/openvpn_as/doc/post_auth/post_auth.txt
+
+
+Advanced LDAP Configuration
+---------------------------
+
+This document describes Advanced LDAP configuration settings:
+
+/usr/local/openvpn_as/doc/ldap.txt
+
+
+Pushing custom scripts to clients on VPN connect/disconnect
+-----------------------------------------------------------
+
+The Access Server supports pushing custom scripts to clients
+on VPN connect/disconnect.  This is described in detail in the
+following document:
+
+/usr/local/openvpn_as/doc/cliscripts.txt
+
+
+Managing Web Server certificates
+--------------------------------
+
+When the Access Server is initially installed, it automatically generates
+a self-signed web certificate using these commands (substitute your
+server domain name in place of SERVER_DOMAIN_NAME):
+
+./certool -d /usr/local/openvpn_as/etc/web-ssl --type ca --unique --cn "OpenVPN Web CA"
+./certool -d /usr/local/openvpn_as/etc/web-ssl --type server --remove_csr --sn_off --serial 1 --name server --cn SERVER_DOMAIN_NAME
+
+Because these certificates are self-signed, they will cause warnings
+from web browsers until you replace them with a commercial web
+certificate (the Web Server page in the Admin UI to do this).
+
+
+Managing user or group-specific access control rules
+----------------------------------------------------
+
+Specify an Access Control List for a user or group, allowing them
+to access one or more subnets on the server-side network by routing
+or NAT.
+
+For example, to allow a user/group to access 192.168.4.0/24 and 10.10.0.0/24 via NAT: 
+
+  ./sacli --user <USER_OR_GROUP> --key access_to.0 --value "+NAT:192.168.4.0/24" UserPropPut
+  ./sacli --user <USER_OR_GROUP> --key access_to.1 --value "+NAT:10.10.0.0/24" UserPropPut
+  ./sacli start
+
+Or to allow a user/group to only access TCP ports 80 or 443 from 10.10.0.0/24 via routing:
+
+  ./sacli --user <USER_OR_GROUP> --key access_to.0 --value "+ROUTE:10.10.0.0/24:tcp/80,tcp/443" UserPropPut
+  ./sacli start
+
+Or to allow a user/group to only access TCP ports 80 and 443, and UDP ports 2000-2999 on the
+specific IP addresses 10.10.0.2 and 10.10.0.5, via NAT:
+
+  ./sacli --user <USER_OR_GROUP> --key access_to.0 --value "+NAT:10.10.0.2:tcp/80,tcp/443,udp/2000-2999" UserPropPut
+  ./sacli --user <USER_OR_GROUP> --key access_to.1 --value "+NAT:10.10.0.5:tcp/80,tcp/443,udp/2000-2999" UserPropPut
+  ./sacli start
+
+As always, use ./confdba -us to see the current user/group properties.
+
+Here is the full reference for the Access Control model:
+
+      Allow user/group (or subnets routing through a
+      VPN gateway authenticated as this user) to access these resources:
+          access_from.0 <resource1>
+          access_from.1 <resource2>
+          ...
+
+      Allow these resources to access user IP (or subnets routing
+      through a VPN gateway authenticated as this user)
+          access_to.0 <resource1>
+          access_to.1 <resource2>
+          ...
+
+      A resource begins with '+' (allow) or '-' (deny), then
+      continues with a type tag (such as 'USER', 'NAT', 'ROUTE', etc.)
+      If the type requires additional parameters, the type tag is
+      followed by a colon (':'), and type-specific data:
+      
+      1. USER:<a user or group name>
+      2. NAT:<network>/<numbits>[:SERVICES]
+      3. ROUTE:<network>/<numbits>[:SERVICES]
+      4. ALL               -- matches everything, i.e. 0.0.0.0/0
+      5. ALL_VPN_CLIENTS   -- matches all IP addresses and subnets
+                              owned by all VPN clients
+      6. ALL_S2C_SUBNETS   -- matches all server-side subnets as defined
+                              by vpn.server.routing.private_network
+
+      The optional SERVICES parameter is a comma-separated list
+      of protocol/start_port[-end_port] values or well-known service
+      names, e.g.:
+
+        +NAT:10.10.0.0/24:https,udp/1194,tcp/1194,udp/2000-2999
+
+      This example allows access to/from the network 10.10.0.0/24,
+      but only https (TCP 443), UDP 1194, TCP 1194, and UDP 2000-2999
+      traffic is allowed.
+
+      The currently list of well-known service names include:
+
+      {
+        'ftp'   : (('tcp', 21),),
+        'ssh'   : (('tcp', 22),),
+        'smtp'  : (('tcp', 25),),
+        'http'  : (('tcp', 80),),
+        'pop3'  : (('tcp', 110),),
+        'https' : (('tcp', 443),),
+        'imaps' : (('tcp', 993),),
+        'rdp'   : (('tcp', 3389),),
+      }
+
+
+Block client access to local LAN
+--------------------------------
+
+It is possible for the server to dynamically push a flag to the client
+telling it to block client access to the local LAN (except for the
+gateway itself) when the VPN is active.  The client will enumerate
+all subnets on locally connected network interfaces and will block
+only the subnet containing the default gateway (but not the default
+gateway itself).  The block is constructed by routing the blocked
+subnet into the tunnel.
+
+This setting is configured as a user/group property, meaning that it
+can be set for a specific user or group or for the whole server:
+
+To enable:
+
+  ./sacli --user <USER_OR_GROUP> --key prop_block_local --value true UserPropPut
+
+To disable:
+
+  ./sacli --user <USER_OR_GROUP> --key prop_block_local --value false UserPropPut
+
+Like all user properties, USER_OR_GROUP can be a user name, group name, or
+"__DEFAULT__" to apply to the whole server.
+
+
+Block client access to public IPv6 subnets
+------------------------------------------
+
+In some cases when a VPN connection is active on the client, it may be
+desirable to block client access to public IPv6 subnets on the internet,
+to avoid any traffic "leakage" from the client to the internet that
+bypasses the VPN tunnel.  This is useful when the server-side VPN network
+is not configured to handle IPv6, but clients may be connecting from
+locations that support IPv6.
+
+To block IPv6 traffic at the client, the prop_block_ipv6 user property
+may be used.  If true, it will cause the addition of several IPv6 routes
+that block all "off-site" IPv6 traffic, however no attempt is made to
+block LAN-local or link-local traffic or work around existing more-
+specific routes.  Routes installed are: 2000::/4, 3000::/4, fc00::/7
+(to cover default routes which might be installed as 2000::/3,
+plus ULA).
+
+prop_block_ipv6 is configured as a user/group property, meaning that it
+can be set for a specific user or group or for the whole server:
+
+To enable:
+
+  ./sacli --user <USER_OR_GROUP> --key prop_block_ipv6 --value true UserPropPut
+
+To disable:
+
+  ./sacli --user <USER_OR_GROUP> --key prop_block_ipv6 --value false UserPropPut
+
+Like all user properties, USER_OR_GROUP can be a user name, group name, or
+"__DEFAULT__" to apply to the whole server.
+
+Client route bypass
+-------------------
+
+When clients connect to the Access Server, all internet traffic is
+routed through the VPN by default.  It is possible to add exceptions
+to this rule for specific clients that want to reach specific subnets
+on their own, without routing them through the VPN tunnel.
+
+This can be done using the "bypass_route" key:
+
+  bypass_route (list of subnets) -- These subnets or DNS names will
+      NOT be routed through the VPN.
+          bypass_route.0    <network>[/<numbits>]|DNS_NAME
+          bypass_route.1    <network>[/<numbits>]|DNS_NAME
+	  ...
+
+      If numbits is omitted, it defaults to 32.
+
+For example, suppose that user "joe" wants to route all traffic
+through the VPN except for traffic to the subnet 10.10.0.0/24:
+
+  ./sacli --user joe --key bypass_route.0 --value "10.10.0.0/24" UserPropPut
+
+Note: even in the absense of the bypass_route feature, subnets that
+are locally connected to the client will not be routed through the
+VPN by default unless the more restrictive prop_block_local key is
+used (see above).
+
+
+DMZ IP Addresses
+----------------
+
+The Access Server supports a feature where a public IP address on the
+server can be routed into a client's VPN tunnel.  This is useful when
+the VPN "client" is actually a server, and where you want to establish
+a public IP address on the Access Server to act as a gateway to this
+server.
+
+This feature allows one or more public IP addresses (and optionally
+a specific protocol and port number for each IP address) to be NATed
+at the server into the VPN tunnel of a particular client.
+
+  dmz_ip.0 : IPAddr[:'tcp'|'udp'/start_port[-end_port]]
+  dmz_ip.1 : IPAddr[:'tcp'|'udp'/start_port[-end_port]]
+  ...
+
+For example, suppose I have a web server running on port 80 that
+connects to the VPN server as user "webserver".  On the Access
+Server I want to map port 80 on one of the public IP addresses
+of the Access Server to route into the VPN tunnel belonging to
+"webserver", and essentially allow internet users to
+transparently access "webserver" as if it were running
+locally on the Access Server.
+
+Suppose that one of the public IP addresses of the Access Server
+is 76.1.2.3.  Use the following command to construct a DMZ rule
+that will make 76.1.2.3 port 80 an alias for port 80 on the
+"webserver" machine:
+
+  ./sacli --user webserver --key dmz_ip.0 --value "76.1.2.3:tcp/80" UserPropPut
+
+
+Managing iptables
+-----------------
+
+The Access Server makes heavy use of iptables to enable NAT
+functionality and enforce VPN-level access control rules, however
+it also tries to play well with other applications that use iptables
+by maintaining its own chains and making minimal additions to
+standard chains such as INPUT, OUTPUT, and FORWARD.
+
+By default the Access Server prepends to standard chains, and this
+remains the default.  However by using the following config key,
+this behavior can be changed to append, to make it easier to develop
+custom rules which take priority over Access Server-generated rules.
+
+  iptables.append (bool, default=false) -- if true, AS-generated
+    iptables rules will be appended to pre-existing rules.
+    If false, AS-generated rules will be prepended.
+
+To activate iptables append mode:
+
+  ./sacli --key iptables.append --value true ConfigPut
+  ./sacli start
+
+Managing NAT
+------------
+
+The Access Server, by default, will NAT client traffic to the internet.
+
+When NAT is enabled in the Access Server, the source address used to
+NAT client packets out of the server can be controlled.  By default
+the primary source IP address of the outgoing interface will be used,
+however this can be overriden using the following key:
+
+  vpn.server.routing.snat_source.<n> : item
+
+  where item is one of:
+    <iface>:<unit_number> : SNAT iface traffic using IP address of
+                            specific unit
+    <iface>:<ip_addr>     : SNAT iface traffic using specific IP
+                            address
+    <iface>:<start_ip_addr>:<end_ip_addr> : SNAT iface traffic using
+                            a randomly selected source address from
+                            range (randomization occurs according
+                            to the Linux/Netfilter "to-source"
+                            algorithm)
+
+For example, NAT eth0 traffic using a range of public IPs from
+76.49.27.18 to 76.49.27.22:
+
+  ./sacli --key "vpn.server.routing.snat_source.0" --value "eth0:76.49.27.18:76.49.27.22" ConfigPut
+
+Or NAT eth0 traffic via the eth0:4 address:
+
+  ./sacli --key "vpn.server.routing.snat_source.0" --value "eth0:4" ConfigPut
+
+Or NAT eth2 traffic via 1.2.3.4:
+
+  ./sacli --key "vpn.server.routing.snat_source.0" --value "eth2:1.2.3.4" ConfigPut
+
+Multiple rules can be specified for multiple interfaces, e.g.:
+
+  ./sacli --key "vpn.server.routing.snat_source.0" --value "eth0:76.49.27.18:76.49.27.22" ConfigPut
+  ./sacli --key "vpn.server.routing.snat_source.1" --value "eth1:3" ConfigPut
+
+As always, finish the command sequence with
+
+  ./sacli start
+
+to send a warm restart signal to the server to allow parameter changes to
+take hold.
+
+Managing advanced server settings
+---------------------------------
+
+*** Enable/Disable NAT
+
+By default, client traffic is source NATed at the server.  NAT can be
+globally disabled by setting the boolean key vpn.server.nat to false
+(it is set to true by default):
+
+To disable NAT:
+
+./sacli --key vpn.server.nat --value false ConfigPut
+
+*** TCP window, UDP buffer, and and MSS size parameters:
+
+The TCP window and UDP buffer sizes, known as SO_SNDBUF and SO_RCVBUF
+at the socket level, are configurable via the following keys:
+
+vpn.client.client_sockbuf (integer) -- TCP window or UDP buffer size
+on client side of VPN transport socket, set to 0 to use system default
+(default=100000).
+
+vpn.server.server_sockbuf_tcp (integer) -- TCP window size on
+server side of VPN transport socket, set to 0 to use system default
+(default=100000).
+
+vpn.server.server_sockbuf_udp (integer) -- UDP buffer size on
+server side of VPN transport socket, set to 0 to use system default
+(default=100000).
+
+vpn.server.mssfix (integer) -- Configure the TCP MSS size on TCP sessions
+that run over the VPN tunnel (default=1350)
+
+For example, to set all window size values to 20000 and TCP MSS to 1200:
+
+  ./sacli --key vpn.client.client_sockbuf --value 20000 ConfigPut
+  ./sacli --key vpn.server.server_sockbuf_tcp --value 20000 ConfigPut
+  ./sacli --key vpn.server.server_sockbuf_udp --value 20000 ConfigPut
+  ./sacli --key vpn.server.mssfix --value 1200 ConfigPut
+  ./sacli start
+
+Note that in order for the vpn.client.x values to take effect, the client
+profile would need to be re-fetched from the server, because these values
+control directives that are written into the client config file.
+
+*** Session Management:
+
+OpenVPN AS 1.8.0 and later uses a session-token-based authentication
+model where a successful authentication gives the client a session
+token which is then used to satisfy subsequent mid-session
+reauthentication challenges, avoiding the need to repeatedly ask
+the VPN client user for credentials during the course of the session.
+
+Some properties of session tokens:
+
+* A session token is issued to a client after successful
+  authentication.
+
+* When a session token expires, the VPN client will be disconnected
+  until the user re-authenticates.
+
+* A session token is a base64 string constructed from a 128 bit
+  cryptographically strong random number.
+
+* By default, a session token is locked to the client IP address
+  from which the successful authentication occurred and will not be
+  honored if presented by a different IP address (i.e. if a client
+  changes its IP address, the token is no longer valid, so
+  reauthentication must occur).  This behavior can be relaxed
+  by setting the vpn.server.session_ip_lock setting to false
+  (see below).
+
+* By using session tokens, the client never needs to cache the
+  user's password.
+
+* Session tokens have two different kinds of expirations:
+
+  1. live session expiration -- if a client stays connected, the
+     token will expire after 1 day by default.  This value
+     can be modified using the vpn.server.session_expire key
+     (see below).
+
+  2. inactive session expiration -- if a client disconnects,
+     where the disconnect was not requested by the end user, the
+     session token expiration is reduced to 5 minutes from the
+     time of disconnection.  This is done to allow the session
+     token to survive short-term network outages that trigger
+     disconnect/reconnect cycles.  If the client reconnects
+     during this window, the session expiration is
+     restored to the original live session expiration time
+     (i.e. 1 day from the point of original authentication).
+     Note that any intra-session connnect/disconnect cycles
+     will never extend the live session expiration
+     period beyond its original value.
+
+     This value (1 day) can be modified using the
+     vpn.server.inactive_expire key (see below).
+
+* A session token is immediately invalidated if the end user
+  explicitly requests a disconnect from the client UI.
+
+  NOTE: at this time, session token invalidation on explicit
+  disconnect is only supported by the Access Server when the XML-RPC
+  API is enabled (as it is by default).  If the API is disabled,
+  or if a standalone OpenVPN client is used, then an explicit
+  disconnect will be treated like an implicit disconnect where
+  the session will be marked for expiration according to the
+  inactive session expiration period (vpn.server.inactive_expire key).
+
+The Access Server has several parameters that control the use and
+expiration of session tokens.
+
+By default, a session token can only be used by the client IP
+address that created it (by a successful authentication).
+This behavior can be relaxed so that the client can change its
+IP address and still re-use the same session token:
+
+  ./sacli --key vpn.server.session_ip_lock --value false ConfigPut
+  ./sacli start
+
+Session tokens have a configurable expiration period.  A user will
+only be allowed to connect to the VPN server for a given number of
+seconds before they will be required to reauthenticate.  Note that
+this setting will not restrict autologin profiles.  Also, note that
+expiration is only tested for during the mid-session TLS renegotiation
+which is set to 6 hours by default. Set to a very high value (such as
+1000000000) to effectively disable session expiration.  By default,
+the expiration period is 1 day (86400 seconds).
+
+Change the session token expiration period:
+
+  ./sacli --key vpn.server.session_expire --value <NUMBER_OF_SECONDS> ConfigPut
+  ./sacli start
+
+The mid-session TLS renegotiation period controls when an OpenVPN
+client session will renegotiate the underlying SSL/TLS session.
+Normally this renegotiation is invisible to the end-user because the
+session token, if still valid, will be used as an authentication
+proxy.  By default, this value is set to 360 minutes (6 hours).
+Session expiration will only be tested for during TLS renegotiation,
+so if you set vpn.server.session_expire to a lower value, make sure
+to lower vpn.tls_refresh.interval as well.
+
+Change the mid-session TLS renegotiation period:
+
+  ./sacli --key vpn.tls_refresh.interval --value <NUMBER_OF_MINUTES> ConfigPut
+  ./sacli start
+
+When a client implicitly disconnects (where the user didn't request a
+disconnect in the client UI), the session token is put on a short
+expiration period of 5 minutes (referred to as the "inactive expire"
+period) to allow for a seamless reconnect after a short-term network
+outage.  Set this value to 0 to invalidate the session token on any
+disconnect.
+
+Change the inactive expire period:
+
+  ./sacli --key vpn.server.inactive_expire --value <NUMBER_OF_SECONDS> ConfigPut
+  ./sacli start
+
+*** Client keepalive:
+
+OpenVPN will ping its peer
+once every vpn.server.keepalive_ping seconds (default=5).  If no response is
+received within vpn.server.keepalive_timeout seconds (default=40), the
+connection will be presumed down.  On the client side, this will trigger a
+reconnect attempt.  On the server side it will cause a deletion of the
+client instance object after 2 times the vpn.server.keepalive_timeout
+number of seconds have elapsed.
+
+Change the default keepalive timer values:
+
+  ./sacli --key vpn.server.keepalive_ping --value <NUMBER_OF_SECONDS> ConfigPut
+  ./sacli --key vpn.server.keepalive_timeout --value <NUMBER_OF_SECONDS ConfigPut
+  ./sacli start
+
+*** Client inactivity disconnect:
+
+The Access Server can push the OpenVPN "inactive" directive to
+clients.  The inactive directive can be used to compel clients
+to disconnect if their bandwidth is below a given threshold for
+a given length of time.
+
+Control with the following user/group properties:
+
+prop_isec (int, number of seconds over which to sample bytes
+  in/out)
+
+prop_ibytes (int, minimum number of in/out bytes over
+  prop_isec seconds to allow connection to continue)
+
+For example, to disconnect a user who fails to transmit/receive
+at least 50,000 bytes during a 5 minute period:
+
+  ./sacli --user <USER_OR_GROUP> --key prop_isec --value 300 UserPropPut
+  ./sacli --user <USER_OR_GROUP> --key prop_ibytes --value 50000 UserPropPut
+
+*** OpenVPN Daemon port forwarding:
+
+When the Access Server is run in multi-daemon mode (by setting the
+Number of TCP or UDP daemons to 2 or higher on the Server Network
+Settings page of the Admin UI), a pair of iptables/netfilter
+chains (AS0_DPFWD_TCP and AS0_DPFWD_UDP) will be generated to load
+balance between the available OpenVPN daemons.  Normally these rules
+will be applied to traffic entering the system on the interface that
+owns the current default gateway.  This can be overriden with the
+following config key:
+
+  vpn.server.dpfwd_iface.<n> (string) -- incoming interface
+
+For example, suppose I have two interfaces, called "if0" and "if1",
+where I want incoming connections from these interfaces to be passed
+to an available OpenVPN daemon.  This can be accomplished with the
+following configuration commands:
+
+  ./sacli -k vpn.server.dpfwd_iface.0 -v if0 ConfigPut
+  ./sacli -k vpn.server.dpfwd_iface.1 -v if1 ConfigPut
+  ./sacli start
+
+*** Client configuration
+
+These parameters configure the VPN client UI.:
+
+vpn.client.basic (bool, default=true) -- If true, UI assumes a
+  basic layout with limited functionality.  If false, UI
+  adds additional functionality such as "import".
+
+profile.friendly_name (string) -- a friendly, user-visible name
+  that the client UI will use to refer to this server
+
+connect.portal.url (string) -- the URL that will be launched
+  when the client user selects the "Go To" menu item for
+  the profile.
+
+vpn.client.no_web (bool, default=false) -- if true, UI will not
+  assume that the AS for this profile is reachable via web
+  or XML-RPC API
+
+vpn.client.host_field (bool, default=false) -- if true, auth dialog
+  will include a host field that allows the OpenVPN server host
+  to be overriden by the user
+
+vpn.client.host_list.<n> (list of strings) -- if vpn.client.host_field
+  is true, a list of hosts to be presented as a drop-down list in the
+  auth dialog
+
+vpn.client.auth_domain (string) -- a domain suffix such as
+  "@example.com" that is displayed to the right of the username
+  field in the auth dialog
+
+vpn.client.connect_timeout (integer, default=60) -- default timeout
+  (in seconds) that client will attempt to connect before giving up.
+
+Examples:
+
+Set the server's friendly name to "Corporation 9592":
+
+  ./sacli -k profile.friendly_name -v "Corporation 9592" ConfigPut
+
+Allow the user to enter a VPN server domain address in the
+auth dialog (only for User-locked or External PKI profiles):
+
+  ./sacli -k vpn.client.host_field -v true ConfigPut
+
+Present the user with a dropdown list of alternative VPN servers
+in the auth dialog (only for Userlocked or External PKI profiles):
+
+  ./sacli -k vpn.client.host_field -v true ConfigPut
+  ./sacli -k vpn.client.host_list.0 -v "us.example.com" ConfigPut
+  ./sacli -k vpn.client.host_list.1 -v "eu.example.com" ConfigPut
+  ./sacli -k vpn.client.host_list.2 -v "cn.example.com" ConfigPut
+
+Show "@example.com" in auth dialog immediately after username field:
+
+  ./sacli -k vpn.client.auth_domain -v "@example.com" ConfigPut
+
+Redefine the URL for the "Go To" link in the client:
+
+  ./sacli -k connect.portal.url -v "http://www.example.com/" ConfigPut
+
+Notes:
+
+* Run "./sacli start" after all configuration changes have been
+  entered.
+
+* Note that updated client parameters will only take effect on
+  client profiles that are generated after the update.
+
+*** UCARP failover settings
+
+When UCARP-based failover is enabled, these parameters can be used to
+fine-tune the UCARP configuration:
+
+ucarp.vhid (integer, default=94) -- the UCARP "vhid" parameter.  Set
+  to a unique value between 1 and 255 for each AS primary/secondary
+  pair.  Normally, you shouldn't need to modify this value unless you
+  are running two or more AS primary/secondary pairs or other instances
+  of UCARP on the LAN.
+
+ucarp.extra_parms (string) -- this string can be used to pass extra
+  command line parameters to ucarp
+
+To configure:
+
+  ./sacli -k SETTING_NAME -v VALUE ConfigPut
+  ./sacli start
+
+*** Log file rotation
+
+The Access Server normally writes its log file to /var/log/openvpnas.log.
+When the size of the log file exceeds 1 million bytes, the log file
+will be "rotated" to openvpnas.log.<n> where <n> is an increasing integer,
+and a new log file under the original name openvpnas.log will be
+initialized.
+
+To control the size of the log file that triggers rotation, add the
+following to /usr/local/openvpn_as/etc/as.conf
+
+LOG_ROTATE_LENGTH=n
+
+where n is the number of bytes in size that will trigger a rotation.
+
+As always, after editing as.conf, a cold restart of the Access Server
+is necessary:
+
+  /etc/init.d/openvpnas restart
+
+*** Authentication failure lockout policy
+
+By default, repeated authentication failures by non-bootstrap users
+(the bootstrap user is the original Access Server admin user) will
+result in the user being temporarily banned from further login
+attempts.  Note that only non-VPN logins (such as web logins) are
+subject to the lockout policy.  VPN logins, since they also require
+a client certificate and private key, are not well-suited for use
+as an attack vector to brute-force passwords, therefore they are
+excluded from the lockout policy.
+
+Relevant parameters:
+
+vpn.server.lockout_policy.n_fails (integer, default=3) -- number of
+  failures after which user will be locked out.
+
+vpn.server.lockout_policy.reset_time (integer, default=900) --
+  reenable locked out users after this time period.
+
+vpn.server.lockout_policy.max_history (integer, default=10000) --
+  maximum size of lockout dictionary.  If dictionary exceeds this
+  size, it will be purged.
+
+Excluded from lockout policy:
+
+* Bootstrap user logins (the bootstrap user is defined in
+  /usr/local/openvpn_as/etc/as.conf under the key
+  boot_pam_users.0)
+
+* VPN logins
+
+Managing package dependencies
+-----------------------------
+
+By default the Access Server DEB/RPM package is self-sufficient, i.e.
+all dependencies are bundled.  However, some individuals might
+wish to have the Access Server link to the linux distribution version
+of a given package rather than use the Access Server-bundled version.
+This can be advantageous from a security perspective, because it
+obviates the need to update the Access Server every time one of the
+dependent libraries has been updated, and leverages on the existing
+security update infrastructure provided by Linux distributions.
+
+The Access Server provides a tool called "mandep" (manage dependencies)
+which can be used to control whether the Access Server links to its
+bundled version of a package or the linux distribution version.
+
+NOTE: as of this writing, mandep is only supported on installs of the
+Access Server from the Ubuntu 9 and 10 packages.
+
+Examples:
+
+First cd to /usr/local/openvpn_as/scripts
+
+Use the linux distribution version of OpenSSL and OpenLDAP
+instead of the bundled version:
+
+  ./mandep --distro --pkglist="openssl,ldap"
+
+Use the linux distribution version of all elgible packages,
+and try to install them if they are not already installed:
+
+  ./mandep --distro --pkglist=all --auto
+
+Use the bundled version of all elgible packages.  This undoes
+the changes made by --distro:
+
+  ./mandep --bundled --pkglist=all
+
+Show current package status:
+
+  ./mandep --show
+
+Show all mandep options:
+
+  ./mandep --help
+
+The Access Server daemon should always be restarted via the init
+script after changes are made to the mandep settings:
+
+  /etc/init.d/openvpnas restart
+
+
+Managing default client installer settings
+------------------------------------------
+
+When a client installer is downloaded from the Access Server, it is
+possible to customize the default settings of the installer.  In the
+examples below, we configure the settings for all Access Server users
+by using the  __DEFAULT__ user.  Instead of  __DEFAULT__, a user or
+group name could be specified instead.
+
+Configure the installer to control which domains are allowed to push
+user-level scripts.  The end-user will still need to okay the script
+via a warning dialog before it is executed on the client.  This
+example restricts script execution to subdomains of example.com.
+Set value to the empty string ('') to ban all scripts.
+
+  ./sacli --user __DEFAULT__ --key cli_pref_exec_user_domain --value '*.example.com' UserPropPut
+
+Configure the installer to restrict the client from connecting to any
+VPN profile except those that are signed by *.example.com.
+
+  ./sacli --user __DEFAULT__ --key cli_pref_restrict_domain --value '*.example.com' UserPropPut
+
+Configure the installer so that after installation, the client will update
+itself without asking for user confirmation (by default the user will be
+asked for confirmation):
+
+  ./sacli --user __DEFAULT__ --key cli_pref_silent_update --value true UserPropPut
+
+To undo any of the above settings, repeat the command with "--value false"
+or delete the setting entirely with:
+
+  ./sacli --user __DEFAULT__ --key [KEY_NAME] UserPropDel
+
+
+Test Authentication
+-------------------
+
+The authcli tool will test authentication, showing whether or not
+the authentication succeeds, and if so, showing the user properties
+as well.  The authentication request will be routed through the
+current authentication module, i.e. PAM, LDAP, RADIUS, or Local
+Users.
+
+  ./authcli  -u <USER> -p <PASSWORD>
+
+or
+
+  ./authcli  -u <USER>
+
+The latter form will interactively prompt for a password.
+
+
+Access Server Daemon Status and Control
+---------------------------------------
+
+Get live, detailed, low-level VPN status information from the
+OpenVPN daemons (JSON format):
+
+  ./sacli VPNStatus
+
+Show the number of users currently connected to the VPN:
+
+  ./sacli VPNSummary
+
+Show the status of internal Access Server services:
+
+  ./sacli status
+
+Stop internal Access Server services:
+
+  ./sacli stop
+
+Start/restart internal Access Server services:
+
+  ./sacli start
+
+The 'start' command is smart in the sense that if the Access Server
+is already running, and you modified the configuration via
+the Config DB, only those services whose parameters are changed
+will be restarted.  Note that if you modify any parameters in
+the Access Server bootstrap configuration file
+(/usr/local/openvpn_as/etc/as.conf), you will need to do a full unix
+restart in order for those settings to take effect.
+
+Also note that the start/stop commands above don't actually start or
+stop the Access Server daemon itself, only internal services
+within the daemon.  To start/stop the access server daemon itself,
+use the traditional unix syntax:
+
+Start the Access Server daemon:
+
+  /etc/init.d/openvpnas start
+
+Stop the Access Server daemon:
+
+  /etc/init.d/openvpnas stop
+
+Restart the Access Server daemon:
+
+  /etc/init.d/openvpnas restart
+
+
+License Management
+------------------
+
+Activate a license:
+
+  ./liman activate "<LICENSE_KEY>"
+
+Show licensed concurrent connections:
+
+  ./liman info
+
+
+Local Users Module
+------------------
+
+Local users authentication is an alternative to PAM, RADIUS, and
+LDAP authentication, where the user's credentials are stored in the
+user properties DB.  It is useful as a kind of standalone
+authentication system.  Local users authentication also has
+significantly better performance than PAM.
+
+Enable Local Users authentication:
+
+  ./sacli --key auth.module.type --value local ConfigPut
+  ./sacli start
+
+Configure a user's password (only for Local Users authentication):
+
+  ./sacli -u <USER> --new_pass <PASSWORD> SetLocalPassword
+
+Remove a user (only for Local Users authentication):
+
+  ./sacli -u <USER> RemoveLocalPassword
+
+Disable Local Users authentication and revert to PAM:
+
+  ./sacli --key auth.module.type --value pam ConfigPut
+  ./sacli start
+
+
+Log Database
+------------
+
+The Access Server maintains a database of all VPN and Web server
+usage.  This database can be queried via the ./logdba tool.
+
+Dump the entire log database as a CSV file (comma-separated-values):
+
+Show all records in the DB, formatted as CSV (comma-separated-values):
+  logdba --csv
+
+Show all records in the DB, formatted as JSON (Javascript object notation):
+  logdba --json
+
+Show active records, i.e. where VPN session is still connected:
+  logdba --csv --active=1
+
+Show connections/sessions (active or closed) that were initiated within the
+last 4 hours:
+  logdba --csv --start_time_ge="-4h"
+
+Show authentication failures on both the VPN and Web services that occurred
+during the past 24 hours:
+  logdba --csv --start_time_ge="-1d" --auth_bfilt=0
+
+Show only VPN log records (omit web records):
+  logdba --csv --service_filt=VPN
+
+Show only web log records (WEB_ADMIN or WEB_CLIENT).  Both forms
+below are equivalent:
+  logdba --csv --service_filt="WEB_ADMIN,WEB_CLIENT"
+  logdba --csv --service_filt="WEB%"
+
+Show only XML_API log records (omit web and VPN records).  These include
+sacli commands that access the Access Server XML API but omit all XML API
+accesses from the web server.  Also show the API Method that was called.
+Note: adding log_db_xml_api_verbose=true to as.conf will cause web server
+accesses to the XML API to also be logged.
+  logdba --csv --service_filt=XML_API --columns="+api_method"
+
+Show VPN sessions that used more than 2.5MB of bandwidth during the
+past 24 hours, and format bandwidth stats using KB, MB, etc. notation.
+  logdba --csv --start_time_ge="-1d" --bytes_total_ge="2.5mb" --fmt_bw_all
+
+Show all records formatted as JSON, and use unix time instead of formatted
+time:
+  logdba --json --start_time_outfmt=unix
+
+Show the 10 VPN sessions over the last month that used the most bandwidth,
+with the highest bandwidth session shown at the top of the list.
+  logdba --csv --service_filt=VPN --start_time_ge="-1M" --order_by=bytes_total --limit 10 --desc
+
+Show VPN sessions and restrict the columns shown to a subset:
+  logdba --csv --service_filt=VPN --columns="username,start_time,duration,bytes_total,error"
+
+Show users "alice" and "bob" usage during 2009:
+  logdba --csv --username_filt="alice,bob" --start_time_ge="2009.01.01" --start_time_lt="2010.01.01"
+
+Show the 8 most recent records for user bob, ordered from more recent
+to less recent.
+  logdba --csv --limit=8 --desc --username_filt=bob
+
+Show all records, but format the start time according to the RFC 2822 Internet
+email standard:
+  logdba --csv --start_time_outfmt="%a, %d %b %Y %H:%M:%S +0000" --start_time_outfmt_gmt
+
+Show VPN records for the previous 1 day + 12 hours (including still-active
+sessions), show session duration in HH:MM format, and sort by session
+duration by increasing order.
+  logdba --csv --service_filt=VPN --start_time_ge="-1d 12h" --order_by=duration --duration_fmt
+
+For additional info on logdba:
+
+  ./logdba --help
+
+
+Access Server daemon log file
+-----------------------------
+
+By default, the Access Server will write its log file to
+/var/log/openvpnas.log.  When run with UCARP-based failover enabled,
+the top-level UCARP log will be written to /var/log/openvpnas.log
+while the Access Server daemon will log to /var/log/openvpnas-node.log.
+
+It is also possible to have the Access Server log to the Linux syslog
+by adding the following setting to /usr/local/openvpn_as/etc/as.conf :
+
+  SYSLOG=true
+
+After making the change to as.conf, do a cold restart:
+
+  /etc/init.d/openvpnas restart
+
+Note that if UCARP-based failover is enabled, the log streams of
+both the top-level supervisory process (openvpnas) and the
+lower-level AS process (openvpnas-node) will be logged to the syslog.
+
+*** Tracking Access Server memory usage
+
+To track memory usage, the Access Server will log a list of the
+top 20 Python types/classes that have the most instances outstanding,
+as well as any accumulation of uncollectable objects.  By default,
+memory info will be logged once per 6 hours, but can be changed with
+the following settings.
+
+Controlling parameters (/usr/local/openvpn_as/etc/as.conf):
+
+MEMTRACK_SECONDS (int, default=21600) -- log report every n seconds.
+
+MEMTRACK_TOP_SHOW (int, default=20) -- show top n types by number
+    of outstanding object instances.
+
+
+As always, after making changes to as.conf, a cold restart is required:
+
+  /etc/init.d/openvpnas restart
+
+
+View Access Server Databases
+----------------------------
+
+View the current configuration database in JSON format:
+
+  ./confdba -a
+
+View the current user properties database in JSON format:
+
+  ./confdba -us
+
+View the current certificates database:
+
+  ./sa dump
+
+Dump the current log database in CSV format:
+
+  ./logdba --csv
+
+
+Backing up the Access Server
+----------------------------
+
+When the Access Server is off, backing up the Access Server state
+is just a matter of backing up the /usr/local/openvpn_as/etc directory.
+
+When the Access Server is on, to prevent database files from being
+copied in an inconsistent state, you can use the sqlite3 tool
+(in /usr/local/openvpn_as/scripts) to back up the DB files to an
+text .dump file.
+
+The Access Server uses Sqlite DBs located in /usr/local/openvpn_as/etc/db :
+
+  certs.db     : certificates (isn't used if External PKI mode is enabled)
+  config.db    : configuration
+  userprop.db  : user properties/permissions
+  log.db       : connection log
+
+Dump Sqlite DB to text:
+
+  ./sqlite3 [DB_FILE] .dump >[TEXT_FILE]
+
+Restore Sqlite DB from text:
+
+  ./sqlite3 <[TEXT_FILE] [DB_FILE]
+
+While the DBs can be dumped while the Access Server is running, you
+should stop the Access Server before you restore the DBs.
+
+
+Updating DB schema after package upgrade
+----------------------------------------
+
+Normally the Access Server RPM/DEB installer will automatically
+perform any necessary DB schema updates during package upgrades.
+However, it is also possible to update the schema manually using
+the following script:
+
+/usr/local/openvpn_as/scripts/db-update-1.8
+
+
+Controlling the Access Server API remotely via web services API
+---------------------------------------------------------------
+
+The Access Server web services API is enabled on the same port
+used for the client web server.
+
+The Access Server can be configured for remote management via an
+XML-RPC over HTTPS web services API.  By default the full web
+services API is not exposed to the internet.  To enable access
+to it by Access Server admin users only:
+
+  ./sacli --key xmlrpc.relay_level --value 2 ConfigPut
+  ./sacli start
+
+To disable it, but still allow a minimal subset of API methods which
+are needed by the client (this is the default setting):
+
+  ./sacli --key xmlrpc.relay_level --value 1 ConfigPut
+  ./sacli start
+
+To entirely disable the API (will disable the web client and much
+of the functionality of the tray client, allowing only OpenVPN
+connections using pre-existing user-locked, autologin, or External
+PKI profiles, or via the standalone OpenVPN client).
+
+  ./sacli --key xmlrpc.relay_level --value 0 ConfigPut
+  ./sacli start
+
+For development and debugging, if you prepend
+OPENVPN_AS_DEBUG_XML=true before ./sacli commands, sacli will show
+the actual XML sent to and received from the Access Server web
+services port.
+
+Controlling the Access Server API remotely via sacli
+----------------------------------------------------
+
+To remotely control an Access Server using the sacli tool, you must first
+expose the remote Access Server web services API to the internet (note that
+it will be accessible to Access Server admin users only).  So execute these
+commands on the target Access Server:
+
+  ./sacli --key xmlrpc.relay_level --value 2 ConfigPut
+  ./sacli start
+
+Now on the client machine, from the /usr/local/openvpn_as/scripts directory,
+and logged in as any user (root is not required), you can run sacli commands
+targeted to the remote machine.  For example, to run the equivalent of
+"./sacli vpnstatus" on the remote machine, use this command:
+
+./sacli -o /tmp --ssl --ssldir CERTS_DIR --sslserv SERVER -a ADMIN_USER -p PASSWORD vpnstatus
+
+CERTS_DIR -- a directory containing the file ca.crt which in turn contains
+             the root and intermediate certificate(s) of the target Access
+             Server web server.  Having this file allows sacli to verify the
+             identity of the remote Access Server and prevent "Man-in-the-Middle"
+             attacks.  By default, this file may be found on the target
+             Access Server in /usr/local/openvpn_as/etc/web-ssl/ca.crt
+             This option may be omitted if the target Access Server web
+             certificate is signed by a commercial CA.
+
+SERVER -- the hostname[:port] of the target Access Server.  [:port] may be
+          omitted if it is 443.
+
+ADMIN_USER -- an Access Server user with admin privileges.
+
+PASSWORD -- the password of ADMIN_USER user.
+
+If you are running the sacli command interactively, and you want to avoid
+placing the password on the command line, use this form of the command to
+prompt for a non-echoed password from the terminal:
+
+./sacli -o /tmp --ssl --ssldir CERTS_DIR --sslserv SERVER -a ADMIN_USER --prompt vpnstatus
+
+Also note that if you are running sacli from the local root account, you
+may omit the "-o /tmp" option.

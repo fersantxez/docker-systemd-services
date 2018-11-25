@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+if [ -z "$OPENVPN_AS_NOEXPORT" ]; then
+export PYOVPN_VERSION="2.5.2"
+export OPENVPN_AS_BASE="/config"
+export OPENVPN_AS_CONFIG="/config/etc/as.conf"
+export PATH="/config/scripts:/config/bin:/config/sbin:$PATH"
+export LD_LIBRARY_PATH="/config/lib"
+export PYTHONHOME="/config"
+fi
+export PYOVPN_CMDNAME="openvpncdisp"
+python -c "from pyovpn.sagent.sagent_entry import openvpncdisp ; openvpncdisp()" "$@"

@@ -1,0 +1,445 @@
+Access Server Post-Auth Script
+------------------------------
+
+The Access Server supports a user-defined Python script called a
+"post-auth" script that can configure client settings after
+a successful authentication, or deny access altogether.
+
+These are some example use-cases for a post-auth script:
+
+* Set a connecting user's Access Server group based on LDAP
+  group membership for the user.
+
+* Set up a dual-factor authentication system where initial
+  authentication is provided by a one-time-password, RADIUS-based
+  token system, while group assignment is provided by LDAP.
+
+* Verify that a given Access Server user only logs in using
+  a known client machine, by using the MAC address of the client
+  machine as a hardware ID.
+
+* Verify that the client machine contains up-to-date applications
+  (such as virus checker and other security software) before
+  allowing it to connect to the VPN server.
+
+* Set a client's group and/or IP address based on RADIUS attributes
+  returned by RADIUS server.
+
+* Implement a custom challenge-response protocol
+  in addition to username/password authentication.
+
+Several sample post-auth scripts are provided in
+/usr/local/openvpn_as/doc/post_auth
+
+To enable a Python post-auth script, issue the following commands from
+/usr/local/openvpn_as/scripts :
+
+Load the script into the config DB:
+
+./sacli [auth-options] -k auth.module.post_auth_script --value_file=<POST_AUTH_SCRIPT_FILENAME> ConfigPut
+
+Restart the AS auth module:
+
+./sacli [auth-options] start
+
+where [auth-options] is normally "-a <AS_ADMIN_USER>" and will prompt
+for a non-echoed password from the console.  As an alternative, if you
+set "local_root_granted_admin=true" in the AS config file
+(/usr/local/openvpn_as/etc/as.conf), then [auth-options] can be omitted
+as long as the the sacli caller is root.
+
+The Access Server will look for a Python "post_auth" function in the script,
+and will call this function immediately after every successful authentication:
+
+def post_auth(authcred, attributes, authret, info):
+    ...
+
+Note that while the post_auth script is ONLY called after successful
+authentications, the script can veto the authentication and cause it
+to fail.
+
+The parameters passed to the post_auth script include:
+
+authcred : a dictionary containing the following items:
+  1. username (string) -- user name of VPN client provided by end user
+  2. client_ip_addr (string) -- real IP address of VPN client
+  3. client_hw_addr (string, not always available) -- the MAC address
+     of the default gateway interface on the VPN client
+  4. static_response (string, optional) -- a string entered by the user
+     in response to a custom challenge question.
+
+attributes : a dictionary containing the following items:
+  1. client_info -- a dictionary of strings provided by the client, including:
+     a. UV_ASCLI_VER -- version number of connecting AS client
+     b. IV_PLAT -- client platform ('win', 'mac', or 'linux')
+     c. UV_PLAT_REL -- specific version of client platform
+     d. UV_APPVER_<APP_NAME> -- version number of APP_NAME installed on client
+  2. vpn_auth (boolean) -- true if this is a VPN authentication, false
+     if it is another type of authentication (such as web server access)
+  3. reauth (boolean) -- true if this is a VPN mid-session reauthentication,
+     false if it is an initial VPN authentication, and absent for non-VPN
+     authentications.
+
+authret : a dictionary containing the authentication status, and may
+be modified and returned by the script.
+
+Important note on username matching:  some authentication systems
+(such as LDAP) allow fuzzy matching on the username.  This means that
+an entry for "Joe.User" in the LDAP DB would allow logins for
+"joe.user", "JOE.USER", etc.  When calling the post_auth script,
+authcred['username'] will be set to the actual username entered by
+the user, but authret['user'] will be set to the canonical name of
+the user, i.e. the exact username string in the LDAP DB.  So, for
+example, if "Joe.User" is listed in the LDAP DB, but the user logs
+in as "joe.user', then authcred['username'] will be set to "joe.user"
+but authret['user'] will be set to "Joe.User".  The important point
+here for post_auth script developers is that if you are making
+an authentication decision based on username, always use the
+canonical username: authret['user'].
+
+If the script returns authret unmodified, there will be no effect on the
+authentication process, i.e. authentication will proceed as if the script
+was not present.
+
+However by modifying authret, the script can effect changes in the
+authentication process including:
+
+1. Causing authentication to fail by setting 'status' item to FAIL.
+
+2. When failing authentication, generating failure strings that will be
+   shown in the log file ('reason' item) or pushed to the client for
+   display to the end user ('client_reason' item).
+
+3. Setting the properties of the client instance object on the server
+   including group, IP address, and other properties.
+
+In detail, the authret dictionary contains the following items:
+
+  status (int, required) -- should be set to SUCCEED or FAIL (these symbols
+      can be imported with the statement "from pyovpn.plugin import *")
+
+  user (string, required) -- the canonical username of the user.  In some
+      cases this username may differ from the username in authcred, for
+      example due to LDAP case-insensitive matching.  When the LDAP
+      auth module is enabled, this username is the username actually
+      stored in the LDAP DB, while authcred['username'] is the username
+      entered by the user.
+  
+  reason (string, optional) -- on auth failure, this string will be output
+      to the log file for diagnostic purposes
+  
+  client_reason (string, optional) -- on auth failure, this string will be
+      sent to the VPN client and will be shown to the user in an error
+      dialog box
+  
+  proplist (dictionary, optional) -- a list of user properties for the
+      connecting user.  In most cases, only the conn_group member need be
+      set, since the group can define all other properties.
+  
+      * conn_group -- (string) designate this user as being a member of
+                      the given group.  Note -- when setting conn_group
+                      in the script, you should generally include:
+                        GROUP_SELECT = True
+                      in the top-level, global part of your script.
+                      This tells the AS to do late user properties
+                      lookup, so that the user properties will be taken
+                      from the group chosen by the post-auth script.
+                      Additionally, any user properties returned by the
+                      script in authret['proplist'] will override those
+                      read from user properties DB.
+
+      * conn_ip -- (string: IP address) dynamic IP address that should be
+                   assigned to user -- this IP address MUST exist within
+                   a group subnet; if conn_group is not specified, AS will
+                   try to derive the group by looking at the set of all
+                   groups, and finding the group for which this IP address
+                   is contained within group_subnets (only in Layer 3 mode)
+    
+      * prop_superuser (boolean) -- designate as AS administrator
+    
+      * prop_autogenerate (boolean) -- allow standard userlogin profiles
+    
+      * prop_autologin (boolean) -- allow autologin profiles
+    
+      * prop_deny_web (boolean) -- deny access to client web server and
+                                   XML/REST web services (but not VPN
+                                   access)
+    
+      * prop_lzo (boolean) -- enable lzo compression
+    
+      * prop_reroute_gw_override (string)
+          'disable'  -- disable reroute_gw for this client
+          'dns_only' -- disable reroute_gw for this client, but still
+                        route DNS
+          'global'   -- use global reroute_gw setting (default)
+
+      * prop_expire (int) -- maximum duration of non-autologin sessions (in seconds)
+                             before reauth required, 0=infinite
+
+      * prop_expire_halt (bool) -- if true, VPN client is halted on prop_expire
+                                   expiration rather than being given the
+				   opportunity to reauth
+
+The info dictionary contains the following members, depending on the
+current auth method:
+
+info : a dictionary containing additional information that is specific to
+the auth_method.
+
+  * auth_method (string) -- contains the auth method ('ldap', 'radius',
+    'pam', or 'local') and may contain special auth methods such as
+    'autologin' (certificate-only auth).
+
+LDAP-specific:
+  * ldap_context (object) -- this is a Python LDAP context object that
+    can be used to perform additional LDAP queries (see example script
+    pas.py).
+  * user_dn (string) -- the LDAP distinguished name of the user that is
+    authenticating.
+
+RADIUS-specific:
+  * radius_reply (dictionary) -- attributes received from the RADIUS
+    server as part of the successful authentication reply
+
+Return Value:
+
+The post_auth function must return either authret or (authret, proplist_save)
+where proplist_save is a set of key/value pairs (dictionary) that should be
+saved back into the user properties DB for future use.  The optional
+proplist_save dictionary allows the script to save state in the user
+properties DB record.  This can be used for such functionality as
+enforcing a "hardware lock", i.e. requiring that users only log in from
+client machines having a known MAC address.  This is demonstrated in the
+sample post_auth script (pas.py).
+
+Exceptions:
+  
+If a Python exception is thrown by the post_auth function, authentication
+will fail, and the reason string will be set to the Python error message.
+
+Testing:
+
+To test the post_auth script, cd to /usr/local/openvpn_as/scripts.
+
+Use the authcli script to test authentication, after the post_auth
+script has been imported into the Access Server using the sacli
+commands above.
+
+For example, we will test using the username 'test' on the sample
+post_auth script pas.py:
+
+$ ./authcli -u test
+API METHOD: authenticate
+Password: <non-echo password entry>
+AUTH_RETURN
+  status : SUCCEED
+  reason : LDAP auth succeeded on ldap://...
+  user : test
+  proplist : {'prop_autogenerate': 'true', 'prop_deny': 'false',
+              'prop_autologin': 'true', 'conn_group': 'default',
+              'type': 'user_connect', 'prop_superuser': 'false'}
+
+Note how 'conn_group' is set to 'default' due to the actions of the
+script.
+
+Examples:
+
+Several sample post-auth scripts are provided in
+/usr/local/openvpn_as/doc/post_auth
+
+Notes:
+
+The post-auth script will NOT be run for the "bootstrap" user.  This is
+done to prevent admin account lockout in the event that the post-auth
+script fails to execute.
+
+The bootstrap user is the initially configured admin user and is always
+authenticated via PAM.  See the boot_pam_users.0 parameter in
+/usr/local/openvpn_as/etc/as.conf for the currently configured bootstrap
+user.
+
+Host-checker query file
+-----------------------
+
+While a post-auth script can verify the existence and version numbers of
+applications on the client, it is first necessary to construct a Host-
+checker query file to enumerate the applications of interest so
+that the client can report on their status.  The host-checker query
+file uses the following grammar:
+
+  # comment
+  [PLATFORM1|'all']
+  NAME1=REGEX1
+  NAME2=REGEX2
+  ...
+
+  [PLATFORM2|'all']
+  NAME1=REGEX1
+  NAME2=REGEX2
+  ...
+
+Where:
+  PLATFORM : one of 'win', 'linux', 'mac', or 'all' (all matches all platforms)
+  NAME : short user-defined symbolic name for the application (can contain
+         alpha-numeric and '_')
+  REGEX : a case-insensitive python regular expression that will be matched
+          against the full application name
+
+The client will use the Host-checker Query File to determine which client
+apps to report on.  If an application name is matched by a REGEX, its version
+number will be returned to the Access Server and be accessible to the
+post_auth script via the attributes['client_info'] dictionary.  For each
+application NAME, the version of the application will be returned as
+UV_APPVER_<NAME> (string) in the attributes['client_info'] dictionary.
+If an application lookup error occurs, UV_APPVER_<NAME> will be set to one
+of the following error strings:
+
+* ERR_NOT_FOUND -- the application was not found
+* ERR_NO_VERSION -- the application was found, but no version number
+                    was specified
+* ERR_MANY_FOUND -- the REGEX is too broad and matches more than one
+                    application
+* ERR_REGEX -- the REGEX could not be compiled
+
+For example, the following one-line Host-checker Query File would return
+the version number of Mozilla Firefox installed on the client to the
+post-auth function. 
+
+FIREFOX=^mozilla firefox
+
+For the purposes of the example, we will assume that the above line is
+saved in a file called appver.txt.  To load the file into the Access Server,
+use the following commands from /usr/local/openvpn_as/scripts:
+
+  ./sacli [auth-options] -k vpn.client.app_verify --value_file=appver.txt ConfigPut
+  ./sacli [auth-options] start
+
+(see above for an explanation of auth-options).
+
+The above commands will then cause appver.txt to be embedded as metadata in
+all client profiles generated from the Access Server after this point.
+In turn, when these profiles are used to connect to the Access Server,
+the version number of specified applications will be passed to the post-auth
+script.  In particular, if the Firefox host-checker query file shown above
+was used, the Firefox version number (or error string) will be accessible as:
+
+  attributes['client_info']['UV_APPVER_FIREFOX']
+
+NOTE: the client will only provide attributes['client_info'] information
+to trusted servers.  Make sure that the profile the client uses to connect to
+your server is trusted.
+
+To simplify the process of writing the Host-checker Query File, a
+command line script is provided on the client to enumerate all known
+applications and their version numbers.  This can be used to craft the REGEX
+expressions to match the client applications of interest.
+
+capicli ShowApps
+
+Setting Environmental Variables on client
+-----------------------------------------
+
+A post-auth script can send data to a client-side connect script in
+the form of environmental variables.  For example, executing the following
+code fragment in a post-auth script will pass to the client script an
+environmental variable called "MY_VAR" having a value of "Test Value".
+
+    # get user's property list, or create it if absent
+    proplist = authret.setdefault('proplist', {})
+
+    # set client-script environmental variable MY_VAR="Test Value"
+    authret['proplist']['prop_cli.script_env.all.MY_VAR'] = 'Test Value' 
+
+AS an alternative, it is possible to pass data to the client script using
+stdin (standard input).  This method is preferred over environmental
+variables when passing security-sensitive data.  See the example script
+pasvar.py for more info.
+
+Challenge/Response Protocol
+---------------------------
+
+The OpenVPN Challenge/Response Protocol allows a post-auth script to
+generate challenge questions that are shown to the user, and to see
+the user's responses to those challenges.  Based on the responses, the
+post-auth script can allow or deny access.
+
+In this way, the OpenVPN Challenge/Response Protocol can be used by a
+post-auth script to implement multi-factor authentication.  Two different
+variations on the challenge/response protocol are supported: The
+"Dynamic" and "Static" protocols.
+
+The basic idea of Challenge/Response is that the user must enter an
+additional piece of information, in addition to the username and
+password, to successfully authenticate.  Normally, this information
+is used to prove that the user posesses a certain key-like device
+such as cryptographic token or a particular mobile phone.
+
+Two sample scripts are provided in /usr/local/openvpn_as/doc/post_auth :
+
+pascr.py -- A basic turing test that asks users to perform a simple
+  multiplication problem after authentication.  This script demonstrates
+  the Dynamic protocol which is used here because the challenge question
+  (for example "what is 7 * 4?") is randomly generated for each login.
+
+pascrs.py -- Asks users to enter the current year.  This script demonstrates
+  the Static protocol which is used here because the challenge question
+  ("what is the current year") never changes.
+
+These sample scripts are intended to serve as examples only.  A true
+multi-factor authentication system would ask the user a question that
+could only be answered by their possession of a unique hardware key,
+such as "Please enter token PIN" (static protocol), or "Please enter
+4932763 into your smartphone Key App, then enter the result below"
+(dynamic protocol).
+
+Dynamic protocol details:
+
+The challenge text is
+dynamically generated AFTER the user has successfully
+authenticated with initial username/password creds.
+The challenge text and response input field is shown to
+the user in a separate dialog box that is raised after
+a successful initial authentication.  The username and
+password is delivered to the post-auth script in an
+initial transaction, and the challenge response is
+delivered later via a second transaction with a state
+dictionary (crstate) used to link the two transactions.
+Use the Dynamic protocol when you want to use different
+challenge text for each login session (although the
+Dynamic protocol will work fine for static challenge
+text as well).
+
+Static protocol details:
+
+The challenge text is constant
+across all users and login sessions and is embedded
+in the client config file.  The challenge text and
+response input field is included in the initial
+username/password dialog.  The username, password,
+and response is delivered in one transaction to the
+post-auth script in "authcred".  Use the static
+protocol when the the challenge text is constant for
+all login sessions.  The Static protocol is generally
+only supported for VPN login.  Other types of sessions
+(such as web sessions) support only the Dynamic
+protocol.  For this reason, post-auth scripts
+that support the Static protocol must be able to
+fall back to the Dynamic protocol if
+authcred['static_response'] is undefined (the
+pascrs.py script demonstrates this).  The Static
+protocol is more efficient than the Dynamic protocol
+because the username, password, and challenge
+response can be queried from the user in a single
+dialog box and delivered to the server in one
+transaction.
+
+Client-side support for challenge/response protocol:
+
+Currently, the Access Server client and standalone OpenVPN
+client support both static and dynamic challenge/response
+protocols.  However, any OpenVPN client UI that drives OpenVPN
+via the management interface needs to add explicit support
+for the challenge/response protocol.
+
+See management/management-notes.txt in the OpenVPN distribution
+for more info.

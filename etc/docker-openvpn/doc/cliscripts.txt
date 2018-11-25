@@ -1,0 +1,166 @@
+Overview
+--------
+
+The OpenVPN Access Server supports pushing of scripts to connecting
+clients, to be executed on connection initiation and termination.
+
+Scripts are stored in the user properties DB (show with ./confdba -us).
+
+Scripts can be specified per user, per group, or globally
+(via __DEFAULT__ user).
+
+The key schema for scripts is as follows:
+
+  prop_cli.script.<linux|win|mac|all>.<user|admin>.<connect|disconnect>
+
+The key contains the actual multi-line script content.  The client will
+interpret the "shebang" line at the beginning of the script and dispatch
+it to the appropriate handler, even on Windows.
+
+As you can see the key contains three permutable variables:
+
+platform: linux, win, mac, or all
+privilege level: user or admin
+run on: connect or disconnect
+
+User level scripts are instantiated in the context of the end user who is
+operating the VPN client, while admin scripts are run as root.
+
+By default, the client will not consider a request by the server to run an
+admin-level script unless a global setting is enabled in the client.
+
+Before a script is run for the first time, the end user will be prompted
+for consent.
+
+Sample Python Scripts
+---------------------
+
+Launch a URL (this example works on Linux, Mac, or Windows):
+
+#!/usr/bin/env python
+# On VPN connection initiation, launch a URL in the default browser.
+# Works on all client platforms (Windows, Mac, Linux).
+import os, webbrowser
+if os.environ['N_RECONNECTS'] == '0':
+    webbrowser.open_new("http://openvpn.net/")
+
+For example, to install this script on the Access Server for all users,
+first place the script in a file, for example myscript.py.  Then install
+with the following command:
+
+  ./sacli --user __DEFAULT__ --key prop_cli.script.all.user.connect --value_file myscript.py UserPropPut
+
+If you only want to the script to run for a particular user or group,
+substitute the user/group name in place of __DEFAULT__.
+
+If you need to use different scripts depending on which platform the
+user is connecting from, use 'win', 'mac', or 'linux' in place of 'all'
+in the --key name.
+
+Here is another script that shows how to download and install an
+application on Windows:
+
+#!/usr/bin/env python
+# Download and install an MSI-based application on Windows.  Leave a marker
+# file behind, so that we only install the application once per local user.
+# Environmental Variables:
+#   MSI_URL -- URL of MSI file
+#   MSI_HASH -- sha1 hash of MSI file, for security verification
+#   MSI_OPT (optional) -- extra MSI arguments, such as /q for quiet install
+import os, urllib, scripthelper as sh
+url = os.environ['MSI_URL']
+local = os.path.basename(url)
+hash = os.environ['MSI_HASH']
+if not os.path.exists(hash):
+    urllib.urlretrieve(url, local)
+    if sh.digest_file(local, 'sha1') != hash:
+        raise ValueError("downloaded file has incorrect hash")
+    os.system("msiexec /i %s %s /l* msi.log" % (local, os.environ.get('MSI_OPT', '')))
+    file(hash, 'w').write('')
+
+Powershell scripting
+--------------------
+
+When pushing a powershell script to Windows clients, the script should
+begin with the following two lines:
+
+#!"C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -ExecutionPolicy ByPass -File
+#EXT ps1
+
+Notes
+-----
+
+Admin-level scripting notes:
+
+* Scripts that run with admin privileges may not
+  be able to interact with the desktop.
+
+* Admin-level scripts (if allowed by client-side setting) will be
+  executed by the client even if the end-user who is currently
+  operating the client does not possess admin privileges.
+
+Userprop script keys:
+
+ * environmental variables to be set before script executes. 
+   These environmental variables may be defined on server, and will
+   be pushed to the client and made available to the script.
+
+     prop_cli.script_env.<linux|win|mac|all>.KEY : VALUE
+
+   Special environmental variables that may be set on the AS:
+
+   PREPATH -- if defined, will be prepended to client's PATH before the
+              script is executed.
+
+   Special environmental variables set by the client backend before
+   scripts are executed:
+
+   N_RECONNECTS (integer rendered as string) -- the number of reconnects
+                that have occurred thus far in this session.
+
+   GRACEFUL_DISCONNECT ("0" or "1") -- set to "1" if this disconnect was
+                       requested by the user, and "0" if the disconnect
+                       was unexpected.
+
+ * script content:
+
+     prop_cli.script.<linux|win|mac|all>.<user|admin>.<connect|disconnect>
+     (multi-line string) -- script content
+
+Script shebang usage for Windows (on unix, shebangs are processed by the OS):
+
+  Leading comment prefix can be one of:
+  1. #
+  2. '
+  3. //
+  4. REM
+  5. rem
+
+  In the examples below, '#' is used as the comment prefix,
+  but it can be replaced with any of the above prefixes.
+
+  [script content] -- defaults to cmd.exe processing
+
+  #!foo.exe
+  [script content... -- find foo.exe in path]
+
+  #!foo.exe -a somearg
+  [script content... -- pass options (the last option is the implicit
+                        script filename)]
+
+  #!"c:\Program Files\Foo Corp\foo.exe" -a somearg
+  [script content... -- quote the program exe]
+
+  #!foo.exe
+  #EXT foo
+  [script content... -- script will be written to a .foo file before
+                        execution]
+
+  #PYTHON
+  [python code -- execute python script using OpenVPN Client built-in
+                  python interpreter]
+
+  #!/usr/bin/env python
+  [python code -- execute python script using OpenVPN Client built-in
+                  python interpreter on Windows, and using default
+                  python install on unix.] 

@@ -3,22 +3,23 @@
 Description=docker-nfs
 After=docker.service
 Requires=docker.service
-
+ 
 [Service]
 TimeoutStartSec=0
 Restart=always
 ExecStartPre=-/usr/bin/docker stop docker-nfs
 ExecStartPre=-/usr/bin/docker rm docker-nfs
-ExecStartPre=-/usr/sbin/modprobe nfs
+ExecStartPre=-/usr/sbin/modprobe nfs 
 ExecStartPre=-/usr/sbin/modprobe nfsd
-ExecStartPre=/usr/bin/docker pull itsthenetwork/nfs-server-alpine
 ExecStart=/usr/bin/docker run --rm --name docker-nfs \
-    --net=host \
+    -i \
     --privileged \
-    -v /mnt/myshare:/nfsshare \
-    -e SHARED_DIRECTORY=/nfsshare \
-    itsthenetwork/nfs-server-alpine:latest
-    #-p 2049:2049
-    #-e READ_ONLY=true
+    -v /mnt/RAID1/Audio/0_Music:/Music \
+    -v /mnt/RAID1/Audio/00_DJ:/DJ \
+    -v /mnt/RAID1/Video:/Video \
+    -v /etc/docker-nfs/exports:/etc/exports:ro \
+    -p 2049:2049 \
+    erichough/nfs-server:1.2.0
+
 [Install]
 WantedBy=multi-user.target

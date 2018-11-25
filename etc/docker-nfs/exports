@@ -1,0 +1,5 @@
+#Path of shares **INSIDE** the container
+/Video *(rw,sync,insecure,no_root_squash)
+/Music *(rw,sync,insecure,no_root_squash)
+/DJ *(rw,sync,insecure,no_root_squash)
+
