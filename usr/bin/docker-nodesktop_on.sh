@@ -23,10 +23,10 @@ echo "** Starting "$CONTAINER
 /usr/bin/docker run \
 --name $CONTAINER \
 -d \
+--privileged \
 --restart=always \
---net=host \
 -p ${NOVNC_PORT}:6901 \
--v /home/${MY_USERNAME}:${HOME_MOUNT_DIR} \
+-v /home/fersanchez:${HOME_MOUNT_DIR} \
 -v /mnt/RAID1:${RAID_MOUNT_DIR} \
 -v /etc/group:/etc/group:ro \
 -v /etc/passwd:/etc/passwd:ro \
@@ -37,5 +37,7 @@ echo "** Starting "$CONTAINER
 -e VNC_RESOLUTION=${VNC_RESOLUTION} \
 -e VNC_PW=${VNC_PW} \
 $IMAGE
+
+echo "** Started "$CONTAINER" from "$IMAGE
 
 echo "** Started "$CONTAINER" from "$IMAGE
