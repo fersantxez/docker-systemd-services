@@ -32,6 +32,7 @@ echo "** Starting "$CONTAINER
 -v /etc/passwd:/etc/passwd:ro \
 -v /etc/shadow:/etc/shadow:ro \
 -v /etc/sudoers.d:/etc/sudoers.d:ro \
+-v /var/run:/var/run \
 --user 1000:1000 \
 -e VNC_COL_DEPTH=${VNC_COL_DEPTH} \
 -e VNC_RESOLUTION=${VNC_RESOLUTION} \
