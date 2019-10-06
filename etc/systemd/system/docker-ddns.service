@@ -1,0 +1,12 @@
+[Unit]
+Description=docker-ddns
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+Type=forking
+ExecStart=/usr/bin/docker-ddns_on.sh
+ExecStop=/usr/bin/docker-ddns_off.sh
+
+[Install]
+WantedBy=multi-user.target
