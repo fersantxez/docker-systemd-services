@@ -1,0 +1,22 @@
+[Unit]
+Description=docker-ddns
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-ddns
+ExecStartPre=-/usr/bin/docker rm docker-ddns
+ExecStartPre=/usr/bin/docker pull fernandosanchez/dns-updater
+ExecStart=/usr/bin/docker run --rm \
+	--name docker-ddns \
+	-e HOST=$MY_DDNS_HOST \
+	-e PORT=8080 \
+	-e SECRET=$DNS_SECRET \
+	-e DOMAIN=$MY_HOSTNAME \
+	fernandosanchez/dns-updater
+ 
+[Install]
+WantedBy=multi-user.target
+
