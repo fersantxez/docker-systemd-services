@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CONTAINER="docker-transmission-ovpn"
+export CONTAINER="transmission-ovpn"
 
 echo "** Stopping "$CONTAINER
 
