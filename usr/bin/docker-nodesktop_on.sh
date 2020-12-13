@@ -1,6 +1,6 @@
 #!/bin/bash
 export CONTAINER="nodesktop"
-export IMAGE="fernandosanchez/nodesktop:0.1"
+export IMAGE="fernandosanchez/nodesktop:latest"
 export NAME=nodesktop
 export VNC_COL_DEPTH=24
 export VNC_RESOLUTION=1680x1050
