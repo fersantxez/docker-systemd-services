@@ -1,0 +1,12 @@
+[Unit]
+Description=docker-transmission-ovpn
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+Type=forking
+ExecStart=/usr/bin/docker-transmission-ovpn_on.sh
+ExecStop=/usr/bin/docker-transmission-ovpn_off.sh
+
+[Install]
+WantedBy=multi-user.target
