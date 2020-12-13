@@ -84,7 +84,8 @@ echo "** Starting "$CONTAINER
 -e TRANSMISSION_RPC_AUTHENTICATION_REQUIRED="true" \
 -e TRANSMISSION_RPC_USERNAME=${TRANSMISSION_USERNAME} \
 -e TRANSMISSION_RPC_PASSWORD=${TRANSMISSION_PASSWORD} \
--v ${CREDENTIALS_PATH}:/etc/openvpn/custom \
+-v ${CREDENTIALS_PATH}/default.ovpn:/etc/openvpn/custom/default.ovpn \
+-v ${CREDENTIALS_PATH}/auth.txt:/etc/openvpn/custom/auth.txt \
 -v ${DOWNLOADS_PATH}:/data \
 -p ${OVPN_WEB_PORT}:9091 \
 -p ${OVPN_TCP_PORT}:51413/tcp \
