@@ -20,11 +20,11 @@ echo "** Starting "$CONTAINER
 --net=host \
 -e TZ=America/New_York \
 -e PLEX_CLAIM=$MY_PLEX_CLAIM \
--v "/mnt/RAID1/PLEX/Library/Application Support/Plex Media Server":/config \
+-v "/share/PLEX/Library/Application Support/Plex Media Server":/config \
 -v /home/nobody/plex_temp/transcode:/transcode \
--v /mnt/RAID1/Video:/Video \
--v /mnt/RAID1/Audio:/Audio \
--v /mnt/RAID1/Pictures:/Pictures \
+-v /share/Video:/Video \
+-v /share/Audio:/Audio \
+-v /share/Pictures:/Pictures \
 $IMAGE
 
 echo "** Started "$CONTAINER" from "$IMAGE
