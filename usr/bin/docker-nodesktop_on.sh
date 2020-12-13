@@ -8,7 +8,7 @@ export VNC_PW=mypassword
 export NOVNC_PORT=6901
 export HOME_MOUNT_DIR=/mnt/home
 export ROOT_MOUNT_DIR=/mnt/root
-export RAID_MOUNT_DIR=/mnt/RAID1
+export SHARE_MOUNT_DIR=/mnt/share
 export MY_USERNAME=fersanchez
 
 echo "** Removing previous instances of "$CONTAINER
@@ -27,7 +27,7 @@ echo "** Starting "$CONTAINER
 --restart=always \
 -p ${NOVNC_PORT}:6901 \
 -v /home/fersanchez:${HOME_MOUNT_DIR} \
--v /mnt/RAID1:${RAID_MOUNT_DIR} \
+-v /share:${SHARE_MOUNT_DIR} \
 -v /etc/group:/etc/group:ro \
 -v /etc/passwd:/etc/passwd:ro \
 -v /etc/shadow:/etc/shadow:ro \
