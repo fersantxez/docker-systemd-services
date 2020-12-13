@@ -1,0 +1,11 @@
+[Unit]
+Description=docker-dns-updater
+After=docker.service
+Requires=docker.service
+ 
+[Service]
+Type=forking
+ExecStart=/usr/bin/docker-dns-updater_on.sh
+
+[Install]
+WantedBy=multi-user.target
