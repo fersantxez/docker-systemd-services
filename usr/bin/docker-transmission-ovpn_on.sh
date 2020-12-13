@@ -1,5 +1,5 @@
 #!/bin/bash
-export CONTAINER="docker-transmission-ovpn"
+export CONTAINER="transmission-ovpn"
 export IMAGE="haugene/transmission-openvpn:latest"
 export RUNASUSER="fersanchez"
 export PUID=$(id -u ${RUNASUSER})
