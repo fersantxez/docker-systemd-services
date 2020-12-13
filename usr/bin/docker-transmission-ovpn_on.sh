@@ -77,7 +77,7 @@ echo "** Starting "$CONTAINER
 --name $CONTAINER \
 -d \
 --restart=always \
---net=host \
+--privileged \
 -e CREATE_TUN_DEVICE="true" \
 -e WEBPROXY_ENABLED="false" \
 -e LOCAL_NETWORK=${LOCAL_NETWORK} \
