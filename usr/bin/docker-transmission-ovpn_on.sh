@@ -72,7 +72,7 @@ echo "** Starting "$CONTAINER
 -e WEBPROXY_ENABLED="false" \
 -e LOCAL_NETWORK=10.52.0.0/24 \
 -e OPENVPN_PROVIDER="CUSTOM" \
--e OPENVPN_OPTS="--inactive 3600 --ping 10 --ping-exit 300"
+-e OPENVPN_OPTS="--inactive 3600 --ping 10 --ping-exit 300" \
 -e OPENVPN_USERNAME=${OPENVPN_USERNAME} \
 -e OPENVPN_PASSWORD=${OPENVPN_PASSWORD} \
 -e PGID=${PGID} \
