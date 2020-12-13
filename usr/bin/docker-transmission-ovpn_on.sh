@@ -20,10 +20,10 @@ export AUTH_TXT=${CREDENTIALS_PATH}"auth.txt"
 export DEFAULT_OVPN=${CREDENTIALS_PATH}"default.ovpn"
 #use a subdir in the user's home folder for credentials (or swap here instead)
 export USERPASS_PATH=$(eval echo "~${RUNASUSER}/.ssh/transmission-ovpn/")
-export OPENVPN_USERNAME=$(cat ${USERPASS_PATH}"ovpn_username")
-export OPENVPN_PASSWORD=$(cat ${USERPASS_PATH}"ovpn_password")
-export TRANSMISSION_USERNAME=$(cat ${USERPASS_PATH}"transmission_username")
-export TRANSMISSION_PASSWORD=$(cat ${USERPASS_PATH}"transmission_password")
+export OPENVPN_USERNAME=${USERPASS_PATH}"ovpn_username"
+export OPENVPN_PASSWORD=${USERPASS_PATH}"ovpn_password"
+export TRANSMISSION_USERNAME=${USERPASS_PATH}"transmission_username"
+export TRANSMISSION_PASSWORD=${USERPASS_PATH}"transmission_password"
 
 if [ -d "$DOWNLOADS_PATH" ]; then
 	echo "** Downloads dir ${DOWNLOADS_PATH} found."
