@@ -57,6 +57,12 @@ for REQUIRED_FILE in "${REQUIRED_FILES[@]}"; do
 
 done
 
+echo "** Also please MAKE SURE to edit "${DEFAULT_OVPN}" and change the line:"
+echo "auth-user-pass"
+echo "** to:"
+echo "auth-user-pass /etc/openvpn/custom/auth.txt"
+echo "Ref: https://github.com/haugene/docker-transmission-openvpn/issues/497" 
+
 echo "** Removing previous instances of "$CONTAINER
 
 /usr/bin/docker ps -q --filter "name=$CONTAINER" \
