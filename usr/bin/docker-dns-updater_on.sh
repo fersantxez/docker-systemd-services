@@ -1,5 +1,5 @@
 #!/bin/bash
-export CONTAINER="dns_updater"
+export CONTAINER="dns-updater"
 export IMAGE="fernandosanchez/dns-updater"
 
 DNS_HOST="dns-server-hostname.domain.com"

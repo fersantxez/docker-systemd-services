@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CONTAINER="docker-kodi"
+export CONTAINER="kodi"
 
 echo "** Stopping "$CONTAINER
 

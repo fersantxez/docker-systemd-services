@@ -1,5 +1,5 @@
 #!/bin/bash
-export CONTAINER="docker-kodi"
+export CONTAINER="kodi"
 export IMAGE="linuxserver/kodi-headless:159"
 
 echo "** Removing previous instances of "$CONTAINER
