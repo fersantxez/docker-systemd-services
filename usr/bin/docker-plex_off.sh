@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CONTAINER="docker-plex"
+export CONTAINER="plex"
 
 echo "** Stopping "$CONTAINER
 
