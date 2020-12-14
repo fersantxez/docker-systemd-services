@@ -20,10 +20,10 @@ export AUTH_TXT=${CREDENTIALS_PATH}"auth.txt"
 export DEFAULT_OVPN=${CREDENTIALS_PATH}"default.ovpn"
 #use a subdir in the user's home folder for credentials (or swap here instead)
 export USERPASS_PATH=$(eval echo "~${RUNASUSER}/.ssh/transmission-ovpn/")
-export OPENVPN_USERNAME=${USERPASS_PATH}"ovpn_username"
-export OPENVPN_PASSWORD=${USERPASS_PATH}"ovpn_password"
-export TRANSMISSION_USERNAME=${USERPASS_PATH}"transmission_username"
-export TRANSMISSION_PASSWORD=${USERPASS_PATH}"transmission_password"
+export OPENVPN_USERNAME_FILE=${USERPASS_PATH}"ovpn_username"
+export OPENVPN_PASSWORD_FILE=${USERPASS_PATH}"ovpn_password"
+export TRANSMISSION_USERNAME_FILE=${USERPASS_PATH}"transmission_username"
+export TRANSMISSION_PASSWORD_FILE=${USERPASS_PATH}"transmission_password"
 
 if [ -d "$DOWNLOADS_PATH" ]; then
 	echo "** Downloads dir ${DOWNLOADS_PATH} found."
@@ -62,6 +62,11 @@ echo "auth-user-pass"
 echo "** to:"
 echo "auth-user-pass /etc/openvpn/custom/auth.txt"
 echo "Ref: https://github.com/haugene/docker-transmission-openvpn/issues/497" 
+
+export OPENVPN_USERNAME=$(cat ${OPENVPN_USERNAME_FILE})
+export OPENVPN_PASSWORD=$(cat ${OPENVPN_PASSWORD_FILE})
+export TRANSMISSION_USERNAME=$(cat ${TRANSMISSION_USERNAME_FILE})
+export TRANSMISSION_PASSWORD=$(cat ${TRANSMISSION_PASSWORD_FILE})
 
 echo "** Removing previous instances of "$CONTAINER
 
