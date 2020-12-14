@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CONTAINER="docker-ddns"
+export CONTAINER="ddns"
 
 echo "** Stopping "$CONTAINER
 

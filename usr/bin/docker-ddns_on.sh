@@ -1,5 +1,5 @@
 #!/bin/bash
-export CONTAINER="docker-ddns"
+export CONTAINER="ddns"
 export IMAGE="fernandosanchez/dns-updater"
 
 HOST=ddns.api.hostname.domain.org
