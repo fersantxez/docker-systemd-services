@@ -1,6 +1,6 @@
 #!/bin/bash
 export CONTAINER="lms"
-export IMAGE="lmscommunity/logitechmediaserver"
+export IMAGE="lmscommunity/logitechmediaserver:8.1.0"
 
 SHARE_PATH="/share" #Change to the share path
 MUSIC_PATH=${SHARE_PATH}"/Audio/0_Music"
@@ -24,7 +24,7 @@ echo "** Starting "$CONTAINER
 --net=host \
 -v ${CONFIG_PATH}:"/config" \
 -v ${MUSIC_PATH}/:"/music" \
--v ${PLAYLIST_PATH}:"playlist":rw \
+-v ${PLAYLIST_PATH}:"/playlist":rw \
 -v "/etc/localtime":"/etc/localtime":ro \
 -v "/etc/timezone":"/etc/timezone":ro \
 -p 9000:9000/tcp \
