@@ -16,7 +16,8 @@ ExecStart=/usr/bin/docker run --rm --name docker-samba-share \
         -p 445:445/tcp  \
         dperson/samba:latest \
         -u "MYUSERNAME;MYPASSWORD" \
-        -s "share;/mount" \
+        -s "share;/mount;;;;;;;comment1" \
+        -s "mister;/mister;;no;;;;;comment2" \
         -n
 [Install]
 WantedBy=multi-user.target
