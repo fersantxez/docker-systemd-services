@@ -26,7 +26,7 @@ echo "** Starting "$CONTAINER
 	--restart=always \
 	--net=host \
         -e ZONE=$ZONE \
-	-e RECORD_TTLE=$RECORD_TTL \
+	-e RECORD_TTL=$RECORD_TTL \
 	-e SHARED_SECRET=$SHARED_SECRET  \
 	$IMAGE
 
