@@ -25,10 +25,9 @@ echo "** Starting "$CONTAINER
 	-d \
 	--restart=always \
 	--net=host \
-	-e HOST=$HOST \
-	-e SECRET=$DNS_SECRET \
-	-e PORT=$PORT \
-	-e DOMAIN=$DOMAIN \
+        -e ZONE=$ZONE \
+	-e RECORD_TTLE=$RECORD_TTL \
+	-e SHARED_SECRET=$SHARED_SECRET  \
 	$IMAGE
 
 echo "** Started "$CONTAINER" from "$IMAGE
