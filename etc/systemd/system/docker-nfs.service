@@ -18,7 +18,14 @@ ExecStart=/usr/bin/docker run --rm --name docker-nfs \
     -v /mnt/RAID1/Audio/00_DJ:/DJ \
     -v /mnt/RAID1/Video:/Video \
     -v /etc/docker-nfs/exports:/etc/exports:ro \
-    -p 2049:2049 \
+    -p 2049:2049/tcp \
+    -p 2049:2049/udp \
+    -p 111:111/tcp \
+    -p 111:111/udp \
+    -p 32765:32765/tcp \
+    -p 32765:32765/udp \
+    -p 32767:32767/tcp \
+    -p 32767:32767/udp \ 
     erichough/nfs-server:1.2.0
 
 [Install]

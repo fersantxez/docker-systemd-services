@@ -1,0 +1,23 @@
+[Unit]
+Description=docker-samba-share
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop docker-samba-share
+ExecStartPre=-/usr/bin/docker rm docker-samba-share
+ExecStartPre=/usr/bin/docker pull dperson/samba:latest
+ExecStart=/usr/bin/docker run --rm --name docker-samba-share \
+        -v /share/:/mount \
+        --net=host \
+        -p 139:139/tcp \
+        -p 445:445/tcp  \
+        dperson/samba:latest \
+        -u "MYUSERNAME;MYPASSWORD" \
+        -s "share;/mount;;;;;;;comment1" \
+        -s "mister;/mister;;no;;;;;comment2" \
+        -n
+[Install]
+WantedBy=multi-user.target
